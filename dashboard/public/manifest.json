@@ -1,0 +1,37 @@
+{
+  "name": "SparkSage Dashboard",
+  "short_name": "SparkSage",
+  "description": "AI-powered Discord bot admin dashboard",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Overview",
+      "url": "/dashboard",
+      "description": "Bot status and stats"
+    },
+    {
+      "name": "Analytics",
+      "url": "/dashboard/analytics",
+      "description": "Usage analytics"
+    }
+  ]
+}

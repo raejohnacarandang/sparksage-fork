@@ -1,20 +1,20 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
-
-import importlib.util
-import os
-
-# Load bot/services/ai.py directly to avoid import shadowing by top-level bot.py
-ai_path = os.path.join(os.path.dirname(__file__), "..", "..", "bot", "services", "ai.py")
-ai_path = os.path.abspath(ai_path)
-spec = importlib.util.spec_from_file_location("bot_services_ai", ai_path)
-ai_module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(ai_module)  # type: ignore
-ai_client = getattr(ai_module, "ai_client")
+from api.auth import decode_token
 
 router = APIRouter()
+security = HTTPBearer()
+
+
+def require_auth(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    payload = decode_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    return payload
 
 
 class ReviewRequest(BaseModel):
@@ -22,12 +22,15 @@ class ReviewRequest(BaseModel):
 
 
 @router.post("")
-async def review(body: ReviewRequest):
+async def review(body: ReviewRequest, _=Depends(require_auth)):
     if not body.content:
         return {"error": "Content required"}
-
     try:
-        result = await ai_client.review(body.content)
-        return result
+        import providers
+        response, provider_name = providers.chat(
+            messages=[{"role": "user", "content": f"Review this code and provide detailed feedback on bugs, style, and improvements:\n\n```\n{body.content}\n```"}],
+            system_prompt="You are an expert code reviewer. Provide clear, actionable feedback.",
+        )
+        return {"result": response, "provider": provider_name}
     except Exception as e:
         return {"error": str(e)}

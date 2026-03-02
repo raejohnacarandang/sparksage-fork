@@ -57,65 +57,85 @@ async def init_db():
         INSERT OR IGNORE INTO wizard_state (id) VALUES (1);
 
         CREATE TABLE IF NOT EXISTS faqs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            guild_id TEXT NOT NULL,
-            question TEXT NOT NULL,
-            answer TEXT NOT NULL,
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id       TEXT NOT NULL,
+            question       TEXT NOT NULL,
+            answer         TEXT NOT NULL,
             match_keywords TEXT NOT NULL,
-            times_used INTEGER DEFAULT 0,
-            created_by TEXT,
-            created_at TEXT DEFAULT (datetime('now'))
+            times_used     INTEGER DEFAULT 0,
+            created_by     TEXT,
+            created_at     TEXT DEFAULT (datetime('now'))
         );
 
         CREATE TABLE IF NOT EXISTS command_permissions (
             command_name TEXT NOT NULL,
-            guild_id TEXT NOT NULL,
-            role_id TEXT NOT NULL,
+            guild_id     TEXT NOT NULL,
+            role_id      TEXT NOT NULL,
             PRIMARY KEY (command_name, guild_id, role_id)
         );
 
         CREATE TABLE IF NOT EXISTS analytics (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            event_type TEXT NOT NULL,
-            guild_id TEXT,
-            channel_id TEXT,
-            user_id TEXT,
-            provider TEXT,
-            tokens_used INTEGER,
-            latency_ms INTEGER,
-            input_tokens INTEGER,
-            output_tokens INTEGER,
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type     TEXT NOT NULL,
+            guild_id       TEXT,
+            channel_id     TEXT,
+            user_id        TEXT,
+            provider       TEXT,
+            tokens_used    INTEGER,
+            latency_ms     INTEGER,
+            input_tokens   INTEGER,
+            output_tokens  INTEGER,
             estimated_cost REAL,
-            created_at TEXT DEFAULT (datetime('now'))
+            created_at     TEXT DEFAULT (datetime('now'))
         );
 
         CREATE TABLE IF NOT EXISTS channel_prompts (
-            channel_id TEXT PRIMARY KEY,
-            guild_id TEXT NOT NULL,
+            channel_id    TEXT PRIMARY KEY,
+            guild_id      TEXT NOT NULL,
             system_prompt TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS scheduled_messages (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id       TEXT NOT NULL,
+            channel_id     TEXT NOT NULL,
+            message        TEXT NOT NULL,
+            scheduled_time TEXT NOT NULL,
+            created_by     TEXT,
+            sent           INTEGER DEFAULT 0,
+            created_at     TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS guild_config (
+            guild_id TEXT NOT NULL,
+            key      TEXT NOT NULL,
+            value    TEXT NOT NULL,
+            PRIMARY KEY (guild_id, key)
         );
         """
     )
     await db.commit()
 
-    # Migration: add new columns to existing analytics table (safe to run multiple times)
-    for col_def in [
-        "input_tokens INTEGER",
-        "output_tokens INTEGER",
-        "estimated_cost REAL",
-    ]:
+    # Migrations: add new columns to existing tables (safe to run multiple times)
+    migrations = [
+        ("analytics", "input_tokens INTEGER"),
+        ("analytics", "output_tokens INTEGER"),
+        ("analytics", "estimated_cost REAL"),
+    ]
+    for table, col_def in migrations:
         try:
-            await db.execute(f"ALTER TABLE analytics ADD COLUMN {col_def}")
+            await db.execute(f"ALTER TABLE {table} ADD COLUMN {col_def}")
             await db.commit()
         except Exception:
-            pass  # Column already exists — ignore
+            pass  # Column already exists
 
 
-# --- Config helpers ---
-
+# =============================================================================
+# Global config helpers
+# =============================================================================
 
 async def get_config(key: str, default: str | None = None) -> str | None:
-    """Get a config value from the database."""
+    """Get a global config value from the database."""
     db = await get_db()
     cursor = await db.execute("SELECT value FROM config WHERE key = ?", (key,))
     row = await cursor.fetchone()
@@ -123,7 +143,7 @@ async def get_config(key: str, default: str | None = None) -> str | None:
 
 
 async def get_all_config() -> dict[str, str]:
-    """Return all config key-value pairs."""
+    """Return all global config key-value pairs."""
     db = await get_db()
     cursor = await db.execute("SELECT key, value FROM config")
     rows = await cursor.fetchall()
@@ -131,7 +151,7 @@ async def get_all_config() -> dict[str, str]:
 
 
 async def set_config(key: str, value: str):
-    """Set a config value in the database."""
+    """Set a global config value."""
     db = await get_db()
     await db.execute(
         "INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
@@ -141,7 +161,7 @@ async def set_config(key: str, value: str):
 
 
 async def set_config_bulk(data: dict[str, str]):
-    """Set multiple config values at once."""
+    """Set multiple global config values at once."""
     db = await get_db()
     await db.executemany(
         "INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
@@ -186,13 +206,71 @@ async def sync_db_to_env():
 
     env_path = os.path.join(os.path.dirname(__file__), ".env")
     all_config = await get_all_config()
-
     for key, value in all_config.items():
         set_key(env_path, key, value)
 
 
-# --- Conversation helpers ---
+# =============================================================================
+# Guild config helpers (per-server settings)
+# =============================================================================
 
+async def get_guild_config(guild_id: str, key: str, default: str | None = None) -> str | None:
+    """Get a guild-specific config value, falling back to global config."""
+    db = await get_db()
+    cursor = await db.execute(
+        "SELECT value FROM guild_config WHERE guild_id = ? AND key = ?",
+        (guild_id, key),
+    )
+    row = await cursor.fetchone()
+    if row:
+        return row["value"]
+    return await get_config(key, default)
+
+
+async def set_guild_config(guild_id: str, key: str, value: str):
+    """Set a guild-specific config value."""
+    db = await get_db()
+    await db.execute(
+        "INSERT INTO guild_config (guild_id, key, value) VALUES (?, ?, ?) "
+        "ON CONFLICT(guild_id, key) DO UPDATE SET value = excluded.value",
+        (guild_id, key, value),
+    )
+    await db.commit()
+
+
+async def get_all_guild_config(guild_id: str) -> dict[str, str]:
+    """Get all config for a guild, merged with global (guild overrides global)."""
+    global_cfg = await get_all_config()
+    db = await get_db()
+    cursor = await db.execute(
+        "SELECT key, value FROM guild_config WHERE guild_id = ?",
+        (guild_id,),
+    )
+    rows = await cursor.fetchall()
+    guild_cfg = {row["key"]: row["value"] for row in rows}
+    return {**global_cfg, **guild_cfg}
+
+
+async def delete_guild_config(guild_id: str, key: str):
+    """Delete a guild-specific config value (reverts to global default)."""
+    db = await get_db()
+    await db.execute(
+        "DELETE FROM guild_config WHERE guild_id = ? AND key = ?",
+        (guild_id, key),
+    )
+    await db.commit()
+
+
+async def reset_guild_config(guild_id: str):
+    """Reset ALL guild-specific config (revert everything to global defaults)."""
+    db = await get_db()
+    await db.execute("DELETE FROM guild_config WHERE guild_id = ?", (guild_id,))
+    await db.commit()
+
+
+# =============================================================================
+# Conversation helpers
+# =============================================================================
 
 async def add_message(channel_id: str, role: str, content: str, provider: str | None = None):
     """Add a message to conversation history."""
@@ -208,7 +286,8 @@ async def get_messages(channel_id: str, limit: int = 20) -> list[dict]:
     """Get recent messages for a channel."""
     db = await get_db()
     cursor = await db.execute(
-        "SELECT role, content, provider, created_at FROM conversations WHERE channel_id = ? ORDER BY id DESC LIMIT ?",
+        "SELECT role, content, provider, created_at FROM conversations "
+        "WHERE channel_id = ? ORDER BY id DESC LIMIT ?",
         (channel_id, limit),
     )
     rows = await cursor.fetchall()
@@ -237,13 +316,16 @@ async def list_channels() -> list[dict]:
     return [dict(row) for row in rows]
 
 
-# --- Wizard helpers ---
-
+# =============================================================================
+# Wizard helpers
+# =============================================================================
 
 async def get_wizard_state() -> dict:
     """Get the wizard state."""
     db = await get_db()
-    cursor = await db.execute("SELECT completed, current_step, data FROM wizard_state WHERE id = 1")
+    cursor = await db.execute(
+        "SELECT completed, current_step, data FROM wizard_state WHERE id = 1"
+    )
     row = await cursor.fetchone()
     return {
         "completed": bool(row["completed"]),
@@ -252,7 +334,11 @@ async def get_wizard_state() -> dict:
     }
 
 
-async def set_wizard_state(completed: bool | None = None, current_step: int | None = None, data: dict | None = None):
+async def set_wizard_state(
+    completed: bool | None = None,
+    current_step: int | None = None,
+    data: dict | None = None,
+):
     """Update wizard state fields."""
     db = await get_db()
     updates = []
@@ -267,12 +353,15 @@ async def set_wizard_state(completed: bool | None = None, current_step: int | No
         updates.append("data = ?")
         params.append(json.dumps(data))
     if updates:
-        await db.execute(f"UPDATE wizard_state SET {', '.join(updates)} WHERE id = 1", params)
+        await db.execute(
+            f"UPDATE wizard_state SET {', '.join(updates)} WHERE id = 1", params
+        )
         await db.commit()
 
 
-# --- Session helpers ---
-
+# =============================================================================
+# Session helpers
+# =============================================================================
 
 async def create_session(token: str, user_id: str, expires_at: str):
     """Store a session token."""
@@ -288,7 +377,8 @@ async def validate_session(token: str) -> dict | None:
     """Validate a session token, return session data or None."""
     db = await get_db()
     cursor = await db.execute(
-        "SELECT user_id, expires_at FROM sessions WHERE token = ? AND expires_at > datetime('now')",
+        "SELECT user_id, expires_at FROM sessions "
+        "WHERE token = ? AND expires_at > datetime('now')",
         (token,),
     )
     row = await cursor.fetchone()
@@ -310,11 +400,12 @@ async def close_db():
         _db = None
 
 
-# --- Analytics helpers ---
-
+# =============================================================================
+# Analytics helpers
+# =============================================================================
 
 def _calculate_cost(provider: str, input_tokens: int, output_tokens: int) -> float:
-    """Calculate estimated cost based on provider pricing in config."""
+    """Calculate estimated cost based on provider pricing."""
     try:
         import config as cfg
         pricing = cfg.PROVIDER_PRICING.get(provider, {})
@@ -372,7 +463,6 @@ async def get_analytics_summary(guild_id: str | None = None) -> dict:
     )
     daily = [dict(r) for r in await cursor2.fetchall()]
 
-    # Provider stats with cost
     where2 = "WHERE provider IS NOT NULL" + (" AND guild_id = ?" if guild_id else "")
     cursor3 = await db.execute(
         f"""SELECT provider,
@@ -389,8 +479,9 @@ async def get_analytics_summary(guild_id: str | None = None) -> dict:
     return {"by_type": by_type, "daily": daily, "providers": providers}
 
 
-# --- FAQ helpers ---
-
+# =============================================================================
+# FAQ helpers
+# =============================================================================
 
 async def add_faq(guild_id: str, question: str, answer: str, keywords: str, created_by: str) -> int:
     db = await get_db()
@@ -424,12 +515,15 @@ async def delete_faq(faq_id: int, guild_id: str) -> bool:
 
 async def increment_faq_usage(faq_id: int):
     db = await get_db()
-    await db.execute("UPDATE faqs SET times_used = times_used + 1 WHERE id = ?", (faq_id,))
+    await db.execute(
+        "UPDATE faqs SET times_used = times_used + 1 WHERE id = ?", (faq_id,)
+    )
     await db.commit()
 
 
-# --- Permission helpers ---
-
+# =============================================================================
+# Permission helpers
+# =============================================================================
 
 async def get_allowed_roles(command_name: str, guild_id: str) -> list[str]:
     db = await get_db()
@@ -444,7 +538,8 @@ async def get_allowed_roles(command_name: str, guild_id: str) -> list[str]:
 async def get_command_permissions(guild_id: str) -> list[dict]:
     db = await get_db()
     cursor = await db.execute(
-        "SELECT command_name, role_id FROM command_permissions WHERE guild_id = ? ORDER BY command_name",
+        "SELECT command_name, role_id FROM command_permissions "
+        "WHERE guild_id = ? ORDER BY command_name",
         (guild_id,),
     )
     rows = await cursor.fetchall()
@@ -470,8 +565,9 @@ async def remove_command_permission(command_name: str, guild_id: str, role_id: s
     return cursor.rowcount > 0
 
 
-# --- Channel prompt helpers ---
-
+# =============================================================================
+# Channel prompt helpers
+# =============================================================================
 
 async def get_channel_prompt(channel_id: str) -> str | None:
     db = await get_db()
