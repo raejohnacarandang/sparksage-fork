@@ -25,7 +25,7 @@ export default function ReviewPage() {
     if (!token) return;
     api
       .getConversations(token)
-      .then((data) => setConversations(Array.isArray(data) ? data : data?.channels || data?.conversations || []))
+      .then((data) => setConversations(Array.isArray(data) ? data : (data as any)?.channels || (data as any)?.conversations || []))
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [token]);
