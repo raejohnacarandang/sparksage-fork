@@ -9,7 +9,7 @@ import {
   ShieldAlert, HelpCircle, BarChart2, X, BookOpen,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import type { BotStatus, ProvidersResponse } from "@/lib/api";
+import type { ProvidersResponse } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,22 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
 
+// ── Types — aligned with websocket.py _get_stats() output ─────────────
+interface Guild {
+  id: string;
+  name: string;
+  member_count: number;
+}
+
+interface WsBotStatus {
+  online: boolean;
+  latency_ms: number | null;
+  guild_count: number;
+  guilds: Guild[];
+  username?: string | null;
+}
+
+// ── Mock data ─────────────────────────────────────────────────────────
 const MOCK_ACTIVITY = [
   { id: 1, type: "command", text: "/ask used by @john", time: "2m ago", color: "bg-blue-500" },
   { id: 2, type: "moderation", text: "Bad word detected in #general", time: "5m ago", color: "bg-red-500" },
@@ -55,7 +71,7 @@ export default function DashboardOverview() {
   const { data: session } = useSession();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const [botStatus, setBotStatus] = useState<BotStatus | null>(null);
+  const [botStatus, setBotStatus] = useState<WsBotStatus | null>(null);
   const [providersData, setProvidersData] = useState<ProvidersResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [wsConnected, setWsConnected] = useState(false);
@@ -121,14 +137,16 @@ export default function DashboardOverview() {
   }, [connectWs]);
 
   const primaryProvider = providersData?.providers.find((p) => p.is_primary);
+  const guildsArray: Guild[] = botStatus?.guilds ?? [];
+  const guildCount = botStatus?.guild_count ?? null;
 
-  // Use latency (matches BotStatus type)
-  const latencyColor = botStatus?.latency == null ? "text-muted-foreground"
-    : botStatus.latency < 100 ? "text-green-500"
-    : botStatus.latency < 200 ? "text-yellow-500" : "text-red-500";
-  const latencyLabel = botStatus?.latency == null ? ""
-    : botStatus.latency < 100 ? "Excellent"
-    : botStatus.latency < 200 ? "Good" : "High";
+  // Latency — uses latency_ms from backend
+  const latencyColor = botStatus?.latency_ms == null ? "text-muted-foreground"
+    : botStatus.latency_ms < 100 ? "text-green-500"
+    : botStatus.latency_ms < 200 ? "text-yellow-500" : "text-red-500";
+  const latencyLabel = botStatus?.latency_ms == null ? ""
+    : botStatus.latency_ms < 100 ? "Excellent"
+    : botStatus.latency_ms < 200 ? "Good" : "High";
 
   return (
     <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
@@ -144,7 +162,6 @@ export default function DashboardOverview() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {/* Search */}
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
             <Input
@@ -156,12 +173,7 @@ export default function DashboardOverview() {
             {searchResults.length > 0 && (
               <div className="absolute top-10 left-0 w-full bg-popover border rounded-lg shadow-lg z-50 py-1">
                 {searchResults.map((r) => (
-                  <Link
-                    key={r.href}
-                    href={r.href}
-                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted"
-                    onClick={() => setSearchQuery("")}
-                  >
+                  <Link key={r.href} href={r.href} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted" onClick={() => setSearchQuery("")}>
                     <r.icon className={`h-4 w-4 ${r.color}`} />
                     {r.label}
                   </Link>
@@ -170,14 +182,8 @@ export default function DashboardOverview() {
             )}
           </div>
 
-          {/* Notifications */}
           <div className="relative">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-9 w-9 relative"
-              onClick={() => setShowNotifications(!showNotifications)}
-            >
+            <Button variant="outline" size="icon" className="h-9 w-9 relative" onClick={() => setShowNotifications(!showNotifications)}>
               <Bell className="h-4 w-4" />
               <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center">
                 {NOTIFICATIONS.length}
@@ -201,21 +207,11 @@ export default function DashboardOverview() {
             )}
           </div>
 
-          {/* Dark mode toggle */}
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-9 w-9"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          >
+          <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
             {mounted && (theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />)}
           </Button>
 
-          {/* Live badge */}
-          <Badge
-            variant={wsConnected ? "default" : "destructive"}
-            className="flex items-center gap-1.5 text-xs"
-          >
+          <Badge variant={wsConnected ? "default" : "destructive"} className="flex items-center gap-1.5 text-xs">
             <Radio className={`h-3 w-3 ${wsConnected ? "animate-pulse" : ""}`} />
             {wsConnected ? "Live" : "Reconnecting..."}
           </Badge>
@@ -235,6 +231,9 @@ export default function DashboardOverview() {
                 <Badge variant={botStatus?.online ? "default" : "secondary"}>
                   {botStatus?.online ? "Online" : "Offline"}
                 </Badge>
+                {botStatus?.username && (
+                  <p className="text-xs text-muted-foreground mt-1 truncate">{botStatus.username}</p>
+                )}
               </div>
             )}
           </CardContent>
@@ -247,7 +246,7 @@ export default function DashboardOverview() {
           </CardHeader>
           <CardContent>
             <p className={`text-2xl font-bold ${latencyColor}`}>
-              {botStatus?.latency != null ? `${Math.round(botStatus.latency)}ms` : "--"}
+              {botStatus?.latency_ms != null ? `${Math.round(botStatus.latency_ms)}ms` : "--"}
             </p>
             {latencyLabel && <p className="text-xs text-muted-foreground mt-1">{latencyLabel}</p>}
           </CardContent>
@@ -259,7 +258,7 @@ export default function DashboardOverview() {
             <Server className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{botStatus?.guilds ?? "--"}</p>
+            <p className="text-2xl font-bold">{guildCount ?? "--"}</p>
             <p className="text-xs text-muted-foreground mt-1">Discord servers</p>
           </CardContent>
         </Card>
@@ -291,11 +290,7 @@ export default function DashboardOverview() {
         <CardContent>
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {QUICK_ACTIONS.map((action) => (
-              <Link
-                key={action.href}
-                href={action.href}
-                className="flex flex-col items-center gap-1.5 p-3 rounded-lg border hover:bg-muted transition-colors"
-              >
+              <Link key={action.href} href={action.href} className="flex flex-col items-center gap-1.5 p-3 rounded-lg border hover:bg-muted transition-colors">
                 <action.icon className={`h-5 w-5 ${action.color}`} />
                 <span className="text-xs font-medium text-center">{action.label}</span>
               </Link>
@@ -375,6 +370,27 @@ export default function DashboardOverview() {
                   </div>
                 );
               })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Connected Servers */}
+      {guildsArray.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Connected Servers</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {guildsArray.map((guild) => (
+                <div key={guild.id} className="flex items-center justify-between rounded-lg border px-3 py-2">
+                  <span className="text-sm font-medium truncate">{guild.name}</span>
+                  <Badge variant="secondary" className="ml-2 flex-shrink-0 text-xs">
+                    {guild.member_count} members
+                  </Badge>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
