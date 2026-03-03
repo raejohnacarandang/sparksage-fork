@@ -46,9 +46,6 @@ export default function AnalyticsPage() {
     ? Object.entries(data.by_type).map(([name, value]) => ({ name, value }))
     : [];
 
-    console.log("SESSION:", session);
-    console.log("TOKEN:", token);
-
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -153,8 +150,15 @@ export default function AnalyticsPage() {
                 <CardContent>
                   <ResponsiveContainer width="100%" height={200}>
                     <PieChart>
-                      <Pie data={data.providers} dataKey="count" nameKey="provider" cx="50%" cy="50%" outerRadius={80}
-                        label={({ provider, percent }) => `${provider} ${(percent * 100).toFixed(0)}%`}>
+                      <Pie
+                        data={data.providers}
+                        dataKey="count"
+                        nameKey="provider"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      >
                         {data.providers.map((_, i) => (
                           <Cell key={i} fill={COLORS[i % COLORS.length]} />
                         ))}
@@ -178,48 +182,48 @@ export default function AnalyticsPage() {
           )}
         </>
       )}
-      
+
       {costs.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Cost Tracking</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-muted-foreground border-b">
-                      <th className="text-left pb-2">Provider</th>
-                      <th className="text-left pb-2">Requests</th>
-                      <th className="text-left pb-2">Tokens</th>
-                      <th className="text-left pb-2">Est. Cost</th>
-                      <th className="text-left pb-2">Tier</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {costs.map((c) => (
-                      <tr key={c.provider} className="border-b last:border-0">
-                        <td className="py-2 font-medium">{c.provider}</td>
-                        <td className="py-2">{c.requests}</td>
-                        <td className="py-2">{c.total_tokens}</td>
-                        <td className="py-2">
-                          {c.estimated_cost_usd === 0 ? "Free" : `$${c.estimated_cost_usd}`}
-                        </td>
-                        <td className="py-2">
-                          <span className={`px-2 py-0.5 rounded text-xs ${
-                            c.pricing_note === "Free tier" 
-                              ? "bg-green-100 text-green-700" 
-                              : "bg-orange-100 text-orange-700"
-                          }`}>
-                            {c.pricing_note}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
-          )}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Cost Tracking</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-muted-foreground border-b">
+                  <th className="text-left pb-2">Provider</th>
+                  <th className="text-left pb-2">Requests</th>
+                  <th className="text-left pb-2">Tokens</th>
+                  <th className="text-left pb-2">Est. Cost</th>
+                  <th className="text-left pb-2">Tier</th>
+                </tr>
+              </thead>
+              <tbody>
+                {costs.map((c) => (
+                  <tr key={c.provider} className="border-b last:border-0">
+                    <td className="py-2 font-medium">{c.provider}</td>
+                    <td className="py-2">{c.requests}</td>
+                    <td className="py-2">{c.total_tokens}</td>
+                    <td className="py-2">
+                      {c.estimated_cost_usd === 0 ? "Free" : `$${c.estimated_cost_usd}`}
+                    </td>
+                    <td className="py-2">
+                      <span className={`px-2 py-0.5 rounded text-xs ${
+                        c.pricing_note === "Free tier"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-orange-100 text-orange-700"
+                      }`}>
+                        {c.pricing_note}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
