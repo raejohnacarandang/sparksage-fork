@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { api } from "../../lib/api";
+export const dynamic = "force-dynamic";
 
 export default function OnboardingPage() {
   const { data: session } = useSession();
