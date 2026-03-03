@@ -70,23 +70,19 @@ export default function DashboardOverview() {
 
   const token = (session as { accessToken?: string })?.accessToken;
 
-  // Fix hydration mismatch for theme
   useEffect(() => setMounted(true), []);
 
-  // Search
   useEffect(() => {
     if (!searchQuery.trim()) { setSearchResults([]); return; }
     const q = searchQuery.toLowerCase();
     setSearchResults(QUICK_ACTIONS.filter((a) => a.label.toLowerCase().includes(q)));
   }, [searchQuery]);
 
-  // Providers
   useEffect(() => {
     if (!token) return;
     api.getProviders(token).then((data) => { setProvidersData(data); setLoading(false); });
   }, [token]);
 
-  // WebSocket
   const connectWs = useCallback(() => {
     if (!mountedRef.current) return;
     try {
@@ -125,12 +121,14 @@ export default function DashboardOverview() {
   }, [connectWs]);
 
   const primaryProvider = providersData?.providers.find((p) => p.is_primary);
-  const latencyColor = botStatus?.latency_ms == null ? "text-muted-foreground"
-    : botStatus.latency_ms < 100 ? "text-green-500"
-    : botStatus.latency_ms < 200 ? "text-yellow-500" : "text-red-500";
-  const latencyLabel = botStatus?.latency_ms == null ? ""
-    : botStatus.latency_ms < 100 ? "Excellent"
-    : botStatus.latency_ms < 200 ? "Good" : "High";
+
+  // Use latency (matches BotStatus type)
+  const latencyColor = botStatus?.latency == null ? "text-muted-foreground"
+    : botStatus.latency < 100 ? "text-green-500"
+    : botStatus.latency < 200 ? "text-yellow-500" : "text-red-500";
+  const latencyLabel = botStatus?.latency == null ? ""
+    : botStatus.latency < 100 ? "Excellent"
+    : botStatus.latency < 200 ? "Good" : "High";
 
   return (
     <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
@@ -203,7 +201,7 @@ export default function DashboardOverview() {
             )}
           </div>
 
-          {/* Dark mode toggle — only render after mount to avoid hydration mismatch */}
+          {/* Dark mode toggle */}
           <Button
             variant="outline"
             size="icon"
@@ -237,7 +235,6 @@ export default function DashboardOverview() {
                 <Badge variant={botStatus?.online ? "default" : "secondary"}>
                   {botStatus?.online ? "Online" : "Offline"}
                 </Badge>
-                {botStatus?.username && <p className="text-xs text-muted-foreground mt-1 truncate">{botStatus.username}</p>}
               </div>
             )}
           </CardContent>
@@ -250,7 +247,7 @@ export default function DashboardOverview() {
           </CardHeader>
           <CardContent>
             <p className={`text-2xl font-bold ${latencyColor}`}>
-              {botStatus?.latency_ms != null ? `${Math.round(botStatus.latency_ms)}ms` : "--"}
+              {botStatus?.latency != null ? `${Math.round(botStatus.latency)}ms` : "--"}
             </p>
             {latencyLabel && <p className="text-xs text-muted-foreground mt-1">{latencyLabel}</p>}
           </CardContent>
@@ -262,7 +259,7 @@ export default function DashboardOverview() {
             <Server className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{botStatus?.guild_count ?? "--"}</p>
+            <p className="text-2xl font-bold">{botStatus?.guilds ?? "--"}</p>
             <p className="text-xs text-muted-foreground mt-1">Discord servers</p>
           </CardContent>
         </Card>
@@ -378,27 +375,6 @@ export default function DashboardOverview() {
                   </div>
                 );
               })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Connected Servers */}
-      {botStatus?.guilds && botStatus.guilds.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Connected Servers</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {botStatus.guilds.map((guild) => (
-                <div key={guild.id} className="flex items-center justify-between rounded-lg border px-3 py-2">
-                  <span className="text-sm font-medium truncate">{guild.name}</span>
-                  <Badge variant="secondary" className="ml-2 flex-shrink-0 text-xs">
-                    {guild.member_count} members
-                  </Badge>
-                </div>
-              ))}
             </div>
           </CardContent>
         </Card>
