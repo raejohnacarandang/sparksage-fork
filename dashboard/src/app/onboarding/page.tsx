@@ -1,13 +1,14 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { api } from "../../lib/api";
-export const dynamic = "force-dynamic";
 
 export default function OnboardingPage() {
-  const { data: session } = useSession();
-  const token = (session as any)?.accessToken;
+  const session = useSession();
+  const token = (session?.data as any)?.accessToken;
 
   const [status, setStatus] = useState<{ completed: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -23,7 +24,9 @@ export default function OnboardingPage() {
       .finally(() => setLoading(false));
   }, [token]);
 
-  if (loading) return <div className="p-6">Loading...</div>;
+  if (!session || session.status === "loading" || loading) {
+    return <div className="p-6">Loading...</div>;
+  }
   if (error) return <div className="p-6 text-red-600">{error}</div>;
 
   if (status && !status.completed) {
