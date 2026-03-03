@@ -59,7 +59,7 @@ export function StepReview() {
         }
       }
 
-      await api.completeWizard(token, config);
+      await api.completeWizard(token as string, config);
       reset();
       router.push("/dashboard");
       router.refresh();
