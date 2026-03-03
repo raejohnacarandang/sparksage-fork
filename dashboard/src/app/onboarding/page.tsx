@@ -1,21 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import { api } from "../../lib/api";
 
 export default function OnboardingPage() {
+  const { data: session } = useSession();
+  const token = (session as any)?.accessToken;
+
   const [status, setStatus] = useState<{ completed: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!token) return;
     setLoading(true);
     api
-      .getWizardStatus()
+      .getWizardStatus(token)
       .then((r) => setStatus(r))
       .catch((e) => setError(e?.message || String(e)))
       .finally(() => setLoading(false));
-  }, []);
+  }, [token]);
 
   if (loading) return <div className="p-6">Loading...</div>;
   if (error) return <div className="p-6 text-red-600">{error}</div>;
