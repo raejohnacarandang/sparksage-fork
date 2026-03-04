@@ -23,7 +23,7 @@ export default function DigestPage() {
 
   useEffect(() => {
     if (!token) return;
-    fetch("http://localhost:8000/api/config", {
+    fetch("${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/config", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
@@ -41,7 +41,7 @@ export default function DigestPage() {
     setSaving(true);
     setMessage(null);
     try {
-      const res = await fetch("http://localhost:8000/api/config", {
+      const res = await fetch("${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/config", {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,

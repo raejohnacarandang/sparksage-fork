@@ -34,9 +34,12 @@ export default function FAQPage() {
 
   const token = (session as { accessToken?: string })?.accessToken;
 
+  // Idagdag ito sa taas, bago ang fetchFaqs function
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
   const fetchFaqs = () => {
     if (!token) return;
-    fetch("http://localhost:8000/api/faqs", {
+    fetch(`${API_URL}/api/faqs`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
@@ -54,7 +57,7 @@ export default function FAQPage() {
     setAdding(true);
     setMessage(null);
     try {
-      const res = await fetch("http://localhost:8000/api/faqs", {
+      const res = await fetch(`${API_URL}/api/faqs`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -87,7 +90,7 @@ export default function FAQPage() {
   const handleDelete = async (id: number) => {
     if (!token) return;
     try {
-      const res = await fetch(`http://localhost:8000/api/faqs/${id}`, {
+      const res = await fetch(`${API_URL}/api/faqs/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -152,7 +155,7 @@ export default function FAQPage() {
             onChange={(e) => setKeywords(e.target.value)}
           />
           <Input
-            placeholder="Guild ID (optional â€” leave blank for default)"
+            placeholder="Guild ID (optional — leave blank for default)"
             value={guildId}
             onChange={(e) => setGuildId(e.target.value)}
           />
@@ -214,3 +217,4 @@ export default function FAQPage() {
     </div>
   );
 }
+

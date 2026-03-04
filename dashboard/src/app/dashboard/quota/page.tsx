@@ -34,7 +34,7 @@ export default function QuotaPage() {
     if (!token) return;
     setLoading(true);
 
-    fetch("http://localhost:8000/api/config", {
+    fetch("${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/config", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
@@ -46,7 +46,7 @@ export default function QuotaPage() {
       })
       .catch(() => {});
 
-    fetch("http://localhost:8000/api/quota/stats", {
+    fetch("${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/quota/stats", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())

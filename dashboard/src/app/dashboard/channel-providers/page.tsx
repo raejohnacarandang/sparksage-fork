@@ -36,7 +36,7 @@ export default function ChannelProvidersPage() {
 
   const fetchOverrides = () => {
     if (!token) return;
-    fetch("http://localhost:8000/api/channel-providers", {
+    fetch("${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/channel-providers", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
@@ -52,7 +52,7 @@ export default function ChannelProvidersPage() {
     setAdding(true);
     setMessage(null);
     try {
-      const res = await fetch("http://localhost:8000/api/channel-providers", {
+      const res = await fetch("${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/channel-providers", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ channel_id: channelId, provider }),
@@ -74,7 +74,7 @@ export default function ChannelProvidersPage() {
   const handleDelete = async (ch: ChannelProvider) => {
     if (!token) return;
     try {
-      const res = await fetch(`http://localhost:8000/api/channel-providers/${ch.channel_id}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/channel-providers/${ch.channel_id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });

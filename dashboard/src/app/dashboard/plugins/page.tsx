@@ -27,7 +27,7 @@ export default function PluginsPage() {
 
   const fetchPlugins = () => {
     if (!token) return;
-    fetch("http://localhost:8000/api/plugins", {
+    fetch("${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/plugins", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
@@ -47,7 +47,7 @@ export default function PluginsPage() {
 
     const action = plugin.enabled ? "disable" : "enable";
     try {
-      const res = await fetch(`http://localhost:8000/api/plugins/${plugin.name}/${action}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/plugins/${plugin.name}/${action}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });

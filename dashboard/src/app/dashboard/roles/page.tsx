@@ -159,7 +159,7 @@ export default function RolesPage() {
               <ul className="text-xs text-muted-foreground space-y-1">
                 {perms.map((p) => (
                   <li key={p} className="flex items-center gap-1">
-                    <span className="text-green-500">✓</span> {p}
+                    <span className="text-green-500">?</span> {p}
                   </li>
                 ))}
               </ul>
@@ -205,7 +205,7 @@ export default function RolesPage() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-2">
-            Get Discord ID: Enable Developer Mode in Discord → Right-click user → Copy User ID
+            Get Discord ID: Enable Developer Mode in Discord ? Right-click user ? Copy User ID
           </p>
         </CardContent>
       </Card>
@@ -278,3 +278,4 @@ export default function RolesPage() {
     </div>
   );
 }
+

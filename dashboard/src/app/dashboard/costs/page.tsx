@@ -46,7 +46,7 @@ export default function CostTrackingPage() {
   useEffect(() => {
     if (!token) return;
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 const pricingFetch = fetch(`${API_URL}/api/costs/pricing`, {
   headers: { Authorization: `Bearer ${token}` },
@@ -211,7 +211,7 @@ const analyticsFetch = fetch(`${API_URL}/api/analytics/summary`, {
                         </Badge>
                         {isAlert && (
                           <Badge variant="destructive" className="text-xs">
-                            ⚠️ Alert
+                            ?? Alert
                           </Badge>
                         )}
                       </div>
@@ -262,3 +262,4 @@ const analyticsFetch = fetch(`${API_URL}/api/analytics/summary`, {
     </div>
   );
 }
+

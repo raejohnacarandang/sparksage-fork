@@ -37,7 +37,7 @@ interface ActivityEvent {
   id: number;
   event_type: string;
   user_id: string | null;
-  username: string | null;        // ← add this
+  username: string | null;        // ? add this
   channel_id: string | null;
   provider: string | null;
   latency_ms: number | null;
@@ -173,7 +173,7 @@ export default function DashboardOverview() {
 
     // Recent activity from analytics history
     fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/analytics/history`,
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       { headers: { Authorization: `Bearer ${token}` } }
     )
       .then((r) => r.json())
@@ -186,7 +186,7 @@ export default function DashboardOverview() {
   const connectWs = useCallback(() => {
     if (!mountedRef.current) return;
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const wsUrl = apiUrl.replace(/^https/, "wss").replace(/^http/, "ws") + "/ws/stats";
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
@@ -493,3 +493,4 @@ export default function DashboardOverview() {
     </div>
   );
 }
+
