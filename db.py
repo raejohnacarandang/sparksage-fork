@@ -140,6 +140,16 @@ async def init_db():
                 PRIMARY KEY (guild_id, key)
             );
         """)
+        await db.execute("""
+    CREATE TABLE IF NOT EXISTS dashboard_users (
+        discord_id TEXT PRIMARY KEY,
+        username   TEXT NOT NULL,
+        avatar     TEXT,
+        role       TEXT NOT NULL DEFAULT 'viewer',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+""")
 
 
 # =============================================================================

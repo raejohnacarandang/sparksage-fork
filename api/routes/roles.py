@@ -44,23 +44,6 @@ ROLE_PERMISSIONS = {
     ],
 }
 
-ROLE_TABLE = """
-CREATE TABLE IF NOT EXISTS dashboard_users (
-    discord_id  TEXT PRIMARY KEY,
-    username    TEXT NOT NULL,
-    avatar      TEXT,
-    role        TEXT NOT NULL DEFAULT 'viewer',
-    created_at  TEXT DEFAULT (datetime('now')),
-    updated_at  TEXT DEFAULT (datetime('now'))
-);
-"""
-
-
-async def init_roles_table():
-    db = await database.get_db()
-    await db.execute(ROLE_TABLE)
-    await db.commit()
-
 
 def require_auth(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials
@@ -85,11 +68,11 @@ class UpsertUser(BaseModel):
 @router.get("/api/roles/users")
 async def list_users(_=Depends(require_auth)):
     """List all dashboard users with their roles."""
-    db = await database.get_db()
-    cursor = await db.execute(
-        "SELECT discord_id, username, avatar, role, created_at FROM dashboard_users ORDER BY role, username"
-    )
-    rows = await cursor.fetchall()
+    pool = await database.get_pool()
+    async with pool.acquire() as db:
+        rows = await db.fetch(
+            "SELECT discord_id, username, avatar, role, created_at FROM dashboard_users ORDER BY role, username"
+        )
     return [dict(row) for row in rows]
 
 
@@ -100,12 +83,12 @@ async def get_my_role(payload=Depends(require_auth)):
     if not discord_id:
         return {"role": "viewer", "permissions": ROLE_PERMISSIONS["viewer"]}
 
-    db = await database.get_db()
-    cursor = await db.execute(
-        "SELECT role FROM dashboard_users WHERE discord_id = ?",
-        (str(discord_id),),
-    )
-    row = await cursor.fetchone()
+    pool = await database.get_pool()
+    async with pool.acquire() as db:
+        row = await db.fetchrow(
+            "SELECT role FROM dashboard_users WHERE discord_id = $1",
+            str(discord_id),
+        )
     role = row["role"] if row else "viewer"
     return {
         "role": role,
@@ -119,18 +102,18 @@ async def upsert_user(body: UpsertUser, _=Depends(require_auth)):
     if body.role not in ROLES:
         raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {ROLES}")
 
-    db = await database.get_db()
-    await db.execute(
-        """INSERT INTO dashboard_users (discord_id, username, avatar, role)
-           VALUES (?, ?, ?, ?)
-           ON CONFLICT(discord_id) DO UPDATE SET
-               username = excluded.username,
-               avatar = excluded.avatar,
-               role = excluded.role,
-               updated_at = datetime('now')""",
-        (body.discord_id, body.username, body.avatar, body.role),
-    )
-    await db.commit()
+    pool = await database.get_pool()
+    async with pool.acquire() as db:
+        await db.execute(
+            """INSERT INTO dashboard_users (discord_id, username, avatar, role)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT (discord_id) DO UPDATE SET
+                   username = EXCLUDED.username,
+                   avatar   = EXCLUDED.avatar,
+                   role     = EXCLUDED.role,
+                   updated_at = NOW()""",
+            body.discord_id, body.username, body.avatar, body.role,
+        )
     return {"message": f"User {body.username} set to {body.role}"}
 
 
@@ -140,14 +123,14 @@ async def update_role(discord_id: str, body: UserRole, _=Depends(require_auth)):
     if body.role not in ROLES:
         raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {ROLES}")
 
-    db = await database.get_db()
-    cursor = await db.execute(
-        "UPDATE dashboard_users SET role = ?, updated_at = datetime('now') WHERE discord_id = ?",
-        (body.role, discord_id),
-    )
-    await db.commit()
+    pool = await database.get_pool()
+    async with pool.acquire() as db:
+        result = await db.execute(
+            "UPDATE dashboard_users SET role = $1, updated_at = NOW() WHERE discord_id = $2",
+            body.role, discord_id,
+        )
 
-    if cursor.rowcount == 0:
+    if result == "UPDATE 0":
         raise HTTPException(status_code=404, detail="User not found")
 
     return {"message": f"Role updated to {body.role}"}
@@ -156,10 +139,10 @@ async def update_role(discord_id: str, body: UserRole, _=Depends(require_auth)):
 @router.delete("/api/roles/users/{discord_id}")
 async def remove_user(discord_id: str, _=Depends(require_auth)):
     """Remove a user from the dashboard."""
-    db = await database.get_db()
-    await db.execute(
-        "DELETE FROM dashboard_users WHERE discord_id = ?",
-        (discord_id,),
-    )
-    await db.commit()
+    pool = await database.get_pool()
+    async with pool.acquire() as db:
+        await db.execute(
+            "DELETE FROM dashboard_users WHERE discord_id = $1",
+            discord_id,
+        )
     return {"message": "User removed"}

@@ -29,9 +29,10 @@ async def list_channel_prompts(guild_id: str = "", _=Depends(require_auth)):
     try:
         if guild_id:
             return await db.list_channel_prompts(guild_id)
-        database = await db.get_db()
-        cursor = await database.execute("SELECT * FROM channel_prompts")
-        rows = await cursor.fetchall()
+        # No guild_id — return all prompts across all guilds
+        pool = await db.get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch("SELECT * FROM channel_prompts")
         return [dict(row) for row in rows]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

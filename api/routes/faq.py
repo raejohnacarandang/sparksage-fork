@@ -41,17 +41,18 @@ class FAQItem(BaseModel):
 async def list_faqs(guild_id: str = "", _=Depends(require_auth)):
     """List all FAQs, optionally filtered by guild_id."""
     try:
-        faqs = await db.get_faqs(guild_id) if guild_id else await _get_all_faqs()
-        return faqs
+        if guild_id:
+            return await db.get_faqs(guild_id)
+        return await _get_all_faqs()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 async def _get_all_faqs() -> list[dict]:
     """Get all FAQs across all guilds."""
-    database = await db.get_db()
-    cursor = await database.execute("SELECT * FROM faqs ORDER BY id DESC")
-    rows = await cursor.fetchall()
+    pool = await db.get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("SELECT * FROM faqs ORDER BY id DESC")
     return [dict(row) for row in rows]
 
 
