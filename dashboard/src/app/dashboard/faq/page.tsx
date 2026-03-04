@@ -25,7 +25,6 @@ export default function FAQPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
-  // Form state
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [keywords, setKeywords] = useState("");
@@ -33,9 +32,7 @@ export default function FAQPage() {
   const [adding, setAdding] = useState(false);
 
   const token = (session as { accessToken?: string })?.accessToken;
-
-  // Idagdag ito sa taas, bago ang fetchFaqs function
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   const fetchFaqs = () => {
     if (!token) return;
@@ -117,7 +114,6 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
         </div>
       </div>
 
-      {/* Status message */}
       {message && (
         <Card className={message.ok ? "border-green-400 bg-green-50 dark:bg-green-950/20" : "border-red-400 bg-red-50 dark:bg-red-950/20"}>
           <CardContent className="pt-4 flex items-center gap-2">
@@ -129,7 +125,6 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
         </Card>
       )}
 
-      {/* Add FAQ form */}
       <Card>
         <CardHeader>
           <CardTitle className="text-sm sm:text-base flex items-center gap-2">
@@ -155,7 +150,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
             onChange={(e) => setKeywords(e.target.value)}
           />
           <Input
-            placeholder="Guild ID (optional — leave blank for default)"
+            placeholder="Guild ID (optional - leave blank for default)"
             value={guildId}
             onChange={(e) => setGuildId(e.target.value)}
           />
@@ -169,7 +164,6 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
         </CardContent>
       </Card>
 
-      {/* FAQ list */}
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading FAQs...</p>
       ) : faqs.length === 0 ? (
@@ -217,4 +211,3 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
     </div>
   );
 }
-
