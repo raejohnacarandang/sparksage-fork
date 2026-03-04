@@ -420,6 +420,7 @@ async def log_event(
     guild_id: str | None = None,
     channel_id: str | None = None,
     user_id: str | None = None,
+    username: str | None = None,   # ← idagdag ito
     provider: str | None = None,
     tokens_used: int | None = None,
     latency_ms: int | None = None,
@@ -434,10 +435,10 @@ async def log_event(
     async with pool.acquire() as db:
         await db.execute(
             """INSERT INTO analytics
-               (event_type, guild_id, channel_id, user_id, provider,
+               (event_type, guild_id, channel_id, user_id, username, provider,
                 tokens_used, latency_ms, input_tokens, output_tokens, estimated_cost)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)""",
-            event_type, guild_id, channel_id, user_id, provider,
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)""",
+            event_type, guild_id, channel_id, user_id, username, provider,
             tokens_used, latency_ms, input_tokens, output_tokens, estimated_cost,
         )
 

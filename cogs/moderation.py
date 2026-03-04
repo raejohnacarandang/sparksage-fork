@@ -126,6 +126,7 @@ class Moderation(commands.Cog):
             guild_id=str(message.guild.id),
             channel_id=str(message.channel.id),
             user_id=str(message.author.id),
+            username=message.author.display_name,
         )
 
     # ── /moderation command group ────────────────────────────

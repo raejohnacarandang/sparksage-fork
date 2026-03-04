@@ -80,6 +80,7 @@ class CodeReview(commands.Cog):
             guild_id=str(interaction.guild_id) if interaction.guild_id else None,
             channel_id=str(interaction.channel_id),
             user_id=str(interaction.user.id),
+            username=interaction.user.display_name,
             provider=provider_name,
         )
 
