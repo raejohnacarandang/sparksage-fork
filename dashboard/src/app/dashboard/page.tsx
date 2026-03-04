@@ -19,7 +19,6 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
 
-// ── Types — aligned with websocket.py _get_stats() output ─────────────
 interface Guild {
   id: string;
   name: string;
@@ -34,23 +33,27 @@ interface WsBotStatus {
   username?: string | null;
 }
 
-// ── Mock data ─────────────────────────────────────────────────────────
-const MOCK_ACTIVITY = [
-  { id: 1, type: "command", text: "/ask used by @john", time: "2m ago", color: "bg-blue-500" },
-  { id: 2, type: "moderation", text: "Bad word detected in #general", time: "5m ago", color: "bg-red-500" },
-  { id: 3, type: "faq", text: "FAQ matched: 'how to join'", time: "8m ago", color: "bg-green-500" },
-  { id: 4, type: "command", text: "/summarize used by @maria", time: "12m ago", color: "bg-blue-500" },
-  { id: 5, type: "onboarding", text: "New member @alex joined", time: "15m ago", color: "bg-purple-500" },
-];
+interface ActivityEvent {
+  id: number;
+  event_type: string;
+  user_id: string | null;
+  channel_id: string | null;
+  provider: string | null;
+  latency_ms: number | null;
+  created_at: string;
+}
 
-const MOCK_COMMANDS = [
-  { name: "/ask", count: 42 },
-  { name: "/faq", count: 28 },
-  { name: "/summarize", count: 19 },
-  { name: "/translate", count: 15 },
-  { name: "/review", count: 9 },
-  { name: "/analyze", count: 6 },
-];
+interface CommandCount {
+  name: string;
+  count: number;
+}
+
+interface Notification {
+  id: number;
+  text: string;
+  type: string;
+  time: string;
+}
 
 const QUICK_ACTIONS = [
   { label: "Moderation", href: "/dashboard/moderation", icon: ShieldAlert, color: "text-red-500" },
@@ -61,11 +64,40 @@ const QUICK_ACTIONS = [
   { label: "Settings", href: "/dashboard/settings", icon: Settings, color: "text-gray-500" },
 ];
 
-const NOTIFICATIONS = [
-  { id: 1, text: "Quota usage at 80%", type: "warning", time: "1h ago" },
-  { id: 2, text: "New moderation event detected", type: "alert", time: "2h ago" },
-  { id: 3, text: "Bot restarted successfully", type: "info", time: "3h ago" },
-];
+function timeAgo(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+function eventColor(type: string): string {
+  switch (type) {
+    case "command": return "bg-blue-500";
+    case "moderation": return "bg-red-500";
+    case "faq": return "bg-green-500";
+    case "onboarding": return "bg-purple-500";
+    case "clear": return "bg-orange-500";
+    case "summarize": return "bg-cyan-500";
+    default: return "bg-gray-400";
+  }
+}
+
+function eventText(event: ActivityEvent): string {
+  const user = event.user_id ? `by @${event.user_id}` : "";
+  switch (event.event_type) {
+    case "command": return `/ask used ${user}`.trim();
+    case "clear": return `Conversation cleared ${user}`.trim();
+    case "summarize": return `/summarize used ${user}`.trim();
+    case "faq": return `FAQ matched ${user}`.trim();
+    case "moderation": return `Moderation event in #${event.channel_id ?? "unknown"}`;
+    case "provider_check": return `Provider check ${user}`.trim();
+    default: return `${event.event_type} ${user}`.trim();
+  }
+}
 
 export default function DashboardOverview() {
   const { data: session } = useSession();
@@ -79,6 +111,9 @@ export default function DashboardOverview() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<typeof QUICK_ACTIONS>([]);
+  const [commandData, setCommandData] = useState<CommandCount[]>([]);
+  const [activityData, setActivityData] = useState<ActivityEvent[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<NodeJS.Timeout | null>(null);
@@ -94,9 +129,52 @@ export default function DashboardOverview() {
     setSearchResults(QUICK_ACTIONS.filter((a) => a.label.toLowerCase().includes(q)));
   }, [searchQuery]);
 
+  // Load providers
   useEffect(() => {
     if (!token) return;
     api.getProviders(token).then((data) => { setProvidersData(data); setLoading(false); });
+  }, [token]);
+
+  // Load real analytics data
+  useEffect(() => {
+    if (!token) return;
+
+    // Command usage from analytics summary
+    api.getAnalytics(token).then((data) => {
+      const byType: Record<string, number> = data.by_type || {};
+      const commands: CommandCount[] = Object.entries(byType).map(([name, count]) => ({
+        name: `/${name}`,
+        count: count as number,
+      })).sort((a, b) => b.count - a.count).slice(0, 6);
+      setCommandData(commands);
+
+      // Build notifications from real data
+      const notifs: Notification[] = [];
+      const totalEvents = Object.values(byType).reduce((a: number, b) => a + (b as number), 0);
+      if (totalEvents > 0) {
+        notifs.push({ id: 1, text: `${totalEvents} total events recorded`, type: "info", time: "now" });
+      }
+      if (data.avg_latency_ms) {
+        const latency = data.avg_latency_ms;
+        if (latency > 2000) {
+          notifs.push({ id: 2, text: `High avg latency: ${latency}ms`, type: "warning", time: "now" });
+        } else {
+          notifs.push({ id: 2, text: `Avg response latency: ${latency}ms`, type: "info", time: "now" });
+        }
+      }
+      setNotifications(notifs);
+    }).catch(() => {});
+
+    // Recent activity from analytics history
+    fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/analytics/history`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.events) setActivityData(data.events.slice(0, 5));
+      })
+      .catch(() => {});
   }, [token]);
 
   const connectWs = useCallback(() => {
@@ -140,7 +218,6 @@ export default function DashboardOverview() {
   const guildsArray: Guild[] = botStatus?.guilds ?? [];
   const guildCount = botStatus?.guild_count ?? null;
 
-  // Latency — uses latency_ms from backend
   const latencyColor = botStatus?.latency_ms == null ? "text-muted-foreground"
     : botStatus.latency_ms < 100 ? "text-green-500"
     : botStatus.latency_ms < 200 ? "text-yellow-500" : "text-red-500";
@@ -185,9 +262,11 @@ export default function DashboardOverview() {
           <div className="relative">
             <Button variant="outline" size="icon" className="h-9 w-9 relative" onClick={() => setShowNotifications(!showNotifications)}>
               <Bell className="h-4 w-4" />
-              <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center">
-                {NOTIFICATIONS.length}
-              </span>
+              {notifications.length > 0 && (
+                <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center">
+                  {notifications.length}
+                </span>
+              )}
             </Button>
             {showNotifications && (
               <div className="absolute right-0 top-11 w-72 bg-popover border rounded-lg shadow-lg z-50">
@@ -197,7 +276,9 @@ export default function DashboardOverview() {
                     <X className="h-3 w-3" />
                   </Button>
                 </div>
-                {NOTIFICATIONS.map((n) => (
+                {notifications.length === 0 ? (
+                  <p className="text-sm text-muted-foreground px-3 py-4 text-center">No notifications</p>
+                ) : notifications.map((n) => (
                   <div key={n.id} className="px-3 py-2.5 border-b last:border-0 hover:bg-muted">
                     <p className="text-sm">{n.text}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">{n.time}</p>
@@ -309,18 +390,22 @@ export default function DashboardOverview() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={MOCK_COMMANDS} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                  {MOCK_COMMANDS.map((_, i) => (
-                    <Cell key={i} fill={`hsl(${210 + i * 15}, 70%, 55%)`} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            {commandData.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-12">No command data yet. Use the bot in Discord to see stats.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={commandData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                    {commandData.map((_, i) => (
+                      <Cell key={i} fill={`hsl(${210 + i * 15}, 70%, 55%)`} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
@@ -332,15 +417,19 @@ export default function DashboardOverview() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {MOCK_ACTIVITY.map((item) => (
-                <div key={item.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted">
-                  <span className={`h-2 w-2 rounded-full flex-shrink-0 ${item.color}`} />
-                  <span className="text-sm flex-1 truncate">{item.text}</span>
-                  <span className="text-xs text-muted-foreground flex-shrink-0">{item.time}</span>
-                </div>
-              ))}
-            </div>
+            {activityData.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-12">No recent activity. Use the bot in Discord to see events here.</p>
+            ) : (
+              <div className="space-y-2">
+                {activityData.map((item, i) => (
+                  <div key={i} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted">
+                    <span className={`h-2 w-2 rounded-full flex-shrink-0 ${eventColor(item.event_type)}`} />
+                    <span className="text-sm flex-1 truncate">{eventText(item)}</span>
+                    <span className="text-xs text-muted-foreground flex-shrink-0">{timeAgo(item.created_at)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
