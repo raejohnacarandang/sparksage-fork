@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -22,9 +23,13 @@ class General(commands.Cog):
     async def ask(self, interaction: discord.Interaction, question: str):
         from bot import ask_ai
         await interaction.response.defer()
+
+        start = time.monotonic()
         response, provider_name = await ask_ai(
             interaction.channel_id, interaction.user.display_name, question
         )
+        latency_ms = int((time.monotonic() - start) * 1000)
+
         provider_label = config.PROVIDERS.get(provider_name, {}).get("name", provider_name)
         footer = f"\n-# Powered by {provider_label}"
 
@@ -34,13 +39,21 @@ class General(commands.Cog):
                 chunk += footer
             await interaction.followup.send(chunk)
 
-        # Log analytics
+        # Estimate token counts (rough approximation: 1 token ≈ 4 chars)
+        input_tokens = max(1, len(question) // 4)
+        output_tokens = max(1, len(response) // 4)
+        total_tokens = input_tokens + output_tokens
+
         await database.log_event(
             "command",
             guild_id=str(interaction.guild_id) if interaction.guild_id else None,
             channel_id=str(interaction.channel_id),
             user_id=str(interaction.user.id),
             provider=provider_name,
+            tokens_used=total_tokens,
+            latency_ms=latency_ms,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
         )
 
     # ── /clear ──────────────────────────────────────────────
@@ -52,6 +65,13 @@ class General(commands.Cog):
         await database.clear_messages(str(interaction.channel_id))
         await interaction.response.send_message("✅ Conversation history cleared!")
 
+        await database.log_event(
+            "clear",
+            guild_id=str(interaction.guild_id) if interaction.guild_id else None,
+            channel_id=str(interaction.channel_id),
+            user_id=str(interaction.user.id),
+        )
+
     # ── /summarize ──────────────────────────────────────────
 
     @app_commands.command(
@@ -60,6 +80,7 @@ class General(commands.Cog):
     async def summarize(self, interaction: discord.Interaction):
         from bot import ask_ai, get_history
         await interaction.response.defer()
+
         history = await get_history(interaction.channel_id)
         if not history:
             await interaction.followup.send("No conversation history to summarize.")
@@ -69,10 +90,29 @@ class General(commands.Cog):
             "Please summarize the key points from this conversation so far "
             "in a concise bullet-point format."
         )
+
+        start = time.monotonic()
         response, provider_name = await ask_ai(
             interaction.channel_id, interaction.user.display_name, summary_prompt
         )
+        latency_ms = int((time.monotonic() - start) * 1000)
+
         await interaction.followup.send(f"**Conversation Summary:**\n{response}")
+
+        input_tokens = max(1, len(summary_prompt) // 4)
+        output_tokens = max(1, len(response) // 4)
+
+        await database.log_event(
+            "summarize",
+            guild_id=str(interaction.guild_id) if interaction.guild_id else None,
+            channel_id=str(interaction.channel_id),
+            user_id=str(interaction.user.id),
+            provider=provider_name,
+            tokens_used=input_tokens + output_tokens,
+            latency_ms=latency_ms,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
 
     # ── /provider ────────────────────────────────────────────
 
@@ -91,6 +131,14 @@ class General(commands.Cog):
             f"**Fallback Chain:** {' → '.join(available)}"
         )
         await interaction.response.send_message(msg)
+
+        await database.log_event(
+            "provider_check",
+            guild_id=str(interaction.guild_id) if interaction.guild_id else None,
+            channel_id=str(interaction.channel_id),
+            user_id=str(interaction.user.id),
+            provider=primary,
+        )
 
 
 async def setup(bot: commands.Bot):
