@@ -3,6 +3,7 @@ import threading
 import os
 import uvicorn
 
+
 def start_api_server():
     try:
         from api.main import create_app
@@ -12,17 +13,10 @@ def start_api_server():
     except Exception as e:
         print(f"Failed to start API server: {e}")
 
-async def _init_database():
-    import db
-    await db.init_db()
-    await db.sync_env_to_db()
 
 def main():
     import config
     import providers
-
-    # Initialize DB
-    asyncio.run(_init_database())
 
     available = providers.get_available_providers()
 
@@ -30,13 +24,14 @@ def main():
     print("  SparkSage — Bot + Dashboard Launcher")
     print("=" * 50)
 
-    # Start FastAPI in background thread
+    # Start FastAPI in a background thread.
+    # uvicorn runs its own event loop inside that thread.
+    # api/main.py lifespan handles db.init_db() on uvicorn's loop independently.
     api_thread = threading.Thread(target=start_api_server, daemon=True)
     api_thread.start()
     port = int(os.getenv("DASHBOARD_PORT", "8000"))
     print(f"  API server starting on http://localhost:{port}")
 
-    # Check Discord token
     if not config.DISCORD_TOKEN:
         print("  WARNING: DISCORD_TOKEN not set — bot will not start.")
         try:
@@ -55,7 +50,13 @@ def main():
     from bot import bot
 
     async def start_bot():
-        # Load cogs
+        import db
+        # Reset the pool so it is always created fresh on THIS loop,
+        # never reusing a pool that was created on uvicorn's background loop.
+        await db.reset_pool()
+        await db.init_db()
+        await db.sync_env_to_db()
+
         for cog in ["cogs.faq", "cogs.review"]:
             try:
                 await bot.load_extension(cog)
@@ -63,7 +64,6 @@ def main():
             except Exception as e:
                 print(f"Failed to load {cog}: {e}")
 
-        # Sync slash commands
         async def _sync_after_ready():
             await bot.wait_until_ready()
             try:
@@ -77,12 +77,18 @@ def main():
         asyncio.create_task(_sync_after_ready())
         await bot.start(config.DISCORD_TOKEN)
 
-    # Windows-safe asyncio.run
+    # Explicitly create a new event loop instead of relying on asyncio.run()
+    # or get_event_loop(), both of which behave unpredictably on Python 3.13
+    # Windows after a previous loop has been created and closed.
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     try:
-        asyncio.run(start_bot())
-    except RuntimeError:
-        loop = asyncio.get_event_loop()
         loop.run_until_complete(start_bot())
+    except KeyboardInterrupt:
+        print("\nShutting down...")
+    finally:
+        loop.close()
+
 
 if __name__ == "__main__":
     main()

@@ -8,23 +8,6 @@ from discord import app_commands
 
 import db as database
 
-SCHEDULE_TABLE = """
-CREATE TABLE IF NOT EXISTS scheduled_messages (
-    id SERIAL PRIMARY KEY,
-    guild_id TEXT NOT NULL,
-    channel_id TEXT NOT NULL,
-    message TEXT NOT NULL,
-    scheduled_time TIMESTAMPTZ NOT NULL,
-    created_by TEXT,
-    sent INTEGER DEFAULT 0,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-"""
-async def init_schedule_table():
-    pool = await database.get_pool()
-    async with pool.acquire() as db:
-        await db.execute(SCHEDULE_TABLE)
-
 
 class Schedule(commands.Cog):
     """Schedule announcements to be posted at a specific time."""
@@ -40,34 +23,30 @@ class Schedule(commands.Cog):
     async def check_scheduled(self):
         """Check every 30 seconds for messages to send."""
         try:
-            db = await database.get_db()
-            now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
-            cursor = await db.execute(
-                "SELECT * FROM scheduled_messages WHERE sent = 0 AND scheduled_time <= ?",
-                (now,),
-            )
-            rows = await cursor.fetchall()
-
-            for row in rows:
-                row = dict(row)
-                channel = self.bot.get_channel(int(row["channel_id"]))
-                if channel:
-                    try:
-                        embed = discord.Embed(
-                            description=row["message"],
-                            color=discord.Color.blue(),
-                        )
-                        embed.set_footer(text="📅 Scheduled announcement")
-                        await channel.send(embed=embed)
-                    except Exception as e:
-                        print(f"Failed to send scheduled message {row['id']}: {e}")
-
-                # Mark as sent regardless
-                await db.execute(
-                    "UPDATE scheduled_messages SET sent = 1 WHERE id = ?",
-                    (row["id"],),
+            pool = await database.get_pool()
+            async with pool.acquire() as db:
+                now = datetime.now(timezone.utc)
+                rows = await db.fetch(
+                    "SELECT * FROM scheduled_messages WHERE sent = 0 AND scheduled_time <= $1",
+                    now,
                 )
-            await db.commit()
+                for row in rows:
+                    row = dict(row)
+                    channel = self.bot.get_channel(int(row["channel_id"]))
+                    if channel:
+                        try:
+                            embed = discord.Embed(
+                                description=row["message"],
+                                color=discord.Color.blue(),
+                            )
+                            embed.set_footer(text="📅 Scheduled announcement")
+                            await channel.send(embed=embed)
+                        except Exception as e:
+                            print(f"Failed to send scheduled message {row['id']}: {e}")
+                    await db.execute(
+                        "UPDATE scheduled_messages SET sent = 1 WHERE id = $1",
+                        row["id"],
+                    )
         except Exception as e:
             print(f"Schedule check error: {e}")
 
@@ -97,10 +76,9 @@ class Schedule(commands.Cog):
     ):
         await interaction.response.defer()
 
-        # Validate time format
         try:
-            scheduled_dt = datetime.strptime(time, "%Y-%m-%d %H:%M")
-            if scheduled_dt < datetime.utcnow():
+            scheduled_dt = datetime.strptime(time, "%Y-%m-%d %H:%M").replace(tzinfo=timezone.utc)
+            if scheduled_dt < datetime.now(timezone.utc):
                 await interaction.followup.send("❌ Scheduled time must be in the future.")
                 return
         except ValueError:
@@ -109,26 +87,23 @@ class Schedule(commands.Cog):
             )
             return
 
-        db = await database.get_db()
-        cursor = await db.execute(
-            """INSERT INTO scheduled_messages (guild_id, channel_id, message, scheduled_time, created_by)
-               VALUES (?, ?, ?, ?, ?)""",
-            (
+        pool = await database.get_pool()
+        async with pool.acquire() as db:
+            row = await db.fetchrow(
+                """INSERT INTO scheduled_messages (guild_id, channel_id, message, scheduled_time, created_by)
+                   VALUES ($1, $2, $3, $4, $5) RETURNING id""",
                 str(interaction.guild_id),
                 str(channel.id),
                 message,
-                time,
+                scheduled_dt,
                 str(interaction.user.id),
-            ),
-        )
-        await db.commit()
-        msg_id = cursor.lastrowid
+            )
 
         embed = discord.Embed(
             title="✅ Message Scheduled",
             color=discord.Color.green(),
         )
-        embed.add_field(name="ID", value=f"`#{msg_id}`", inline=True)
+        embed.add_field(name="ID", value=f"`#{row['id']}`", inline=True)
         embed.add_field(name="Channel", value=channel.mention, inline=True)
         embed.add_field(name="Time (UTC)", value=f"`{time}`", inline=True)
         embed.add_field(name="Message", value=message[:500], inline=False)
@@ -139,12 +114,12 @@ class Schedule(commands.Cog):
     async def schedule_list(self, interaction: discord.Interaction):
         await interaction.response.defer()
 
-        db = await database.get_db()
-        cursor = await db.execute(
-            "SELECT * FROM scheduled_messages WHERE guild_id = ? AND sent = 0 ORDER BY scheduled_time ASC",
-            (str(interaction.guild_id),),
-        )
-        rows = await cursor.fetchall()
+        pool = await database.get_pool()
+        async with pool.acquire() as db:
+            rows = await db.fetch(
+                "SELECT * FROM scheduled_messages WHERE guild_id = $1 AND sent = 0 ORDER BY scheduled_time ASC",
+                str(interaction.guild_id),
+            )
 
         if not rows:
             await interaction.followup.send("📭 No scheduled messages.", ephemeral=True)
@@ -169,28 +144,25 @@ class Schedule(commands.Cog):
     @app_commands.describe(id="The ID of the scheduled message to cancel")
     @app_commands.default_permissions(manage_guild=True)
     async def schedule_cancel(self, interaction: discord.Interaction, id: int):
-        db = await database.get_db()
-        cursor = await db.execute(
-            "SELECT * FROM scheduled_messages WHERE id = ? AND guild_id = ? AND sent = 0",
-            (id, str(interaction.guild_id)),
-        )
-        row = await cursor.fetchone()
-
-        if not row:
-            await interaction.response.send_message(
-                f"❌ Scheduled message `#{id}` not found or already sent.", ephemeral=True
+        pool = await database.get_pool()
+        async with pool.acquire() as db:
+            row = await db.fetchrow(
+                "SELECT id FROM scheduled_messages WHERE id = $1 AND guild_id = $2 AND sent = 0",
+                id,
+                str(interaction.guild_id),
             )
-            return
+            if not row:
+                await interaction.response.send_message(
+                    f"❌ Scheduled message `#{id}` not found or already sent.", ephemeral=True
+                )
+                return
+            await db.execute("DELETE FROM scheduled_messages WHERE id = $1", id)
 
-        await db.execute(
-            "DELETE FROM scheduled_messages WHERE id = ?", (id,)
-        )
-        await db.commit()
         await interaction.response.send_message(
             f"✅ Scheduled message `#{id}` cancelled.", ephemeral=True
         )
 
 
 async def setup(bot: commands.Bot):
-    await init_schedule_table()
-    await bot.add_cog(Schedule(bot), override=True)
+    cog = Schedule(bot)
+    await bot.add_cog(cog)

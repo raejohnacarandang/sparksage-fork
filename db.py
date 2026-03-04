@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import json
+import asyncio
 import asyncpg
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
@@ -9,26 +10,42 @@ DATABASE_URL = os.getenv("DATABASE_URL", "")
 _pool: asyncpg.Pool | None = None
 
 
+async def reset_pool() -> None:
+    """Close and discard the current pool so the next get_pool() call
+    creates a fresh one bound to the currently running event loop.
+    Call this at the start of any new event loop that needs DB access."""
+    global _pool
+    if _pool is not None:
+        try:
+            await _pool.close()
+        except Exception:
+            pass
+        _pool = None
+
+
 async def get_pool() -> asyncpg.Pool:
     global _pool
+    # If the pool exists but its loop is closed, discard it.
+    if _pool is not None:
+        try:
+            pool_loop = _pool._holders[0]._con._protocol._loop  # type: ignore[attr-defined]
+            if pool_loop is not None and pool_loop.is_closed():
+                _pool = None
+        except Exception:
+            # Can't inspect the loop — play it safe and recreate.
+            _pool = None
     if _pool is None:
         _pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=10)
     return _pool
 
 
-async def get_db():
-    return await get_pool()
-
-
 async def init_db():
     pool = await get_pool()
     async with pool.acquire() as db:
+        await db.execute(
+            "CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);"
+        )
         await db.execute("""
-            CREATE TABLE IF NOT EXISTS config (
-                key   TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            );
-
             CREATE TABLE IF NOT EXISTS conversations (
                 id         SERIAL PRIMARY KEY,
                 channel_id TEXT    NOT NULL,
@@ -37,25 +54,30 @@ async def init_db():
                 provider   TEXT,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
-
-            CREATE INDEX IF NOT EXISTS idx_conv_channel ON conversations(channel_id);
-
+        """)
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_conv_channel ON conversations(channel_id);"
+        )
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS sessions (
                 token      TEXT PRIMARY KEY,
                 user_id    TEXT NOT NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 expires_at TIMESTAMPTZ NOT NULL
             );
-
+        """)
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS wizard_state (
                 id           INTEGER PRIMARY KEY CHECK (id = 1),
                 completed    INTEGER NOT NULL DEFAULT 0,
                 current_step INTEGER NOT NULL DEFAULT 0,
                 data         TEXT    NOT NULL DEFAULT '{}'
             );
-
-            INSERT INTO wizard_state (id) VALUES (1) ON CONFLICT DO NOTHING;
-
+        """)
+        await db.execute(
+            "INSERT INTO wizard_state (id) VALUES (1) ON CONFLICT DO NOTHING;"
+        )
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS faqs (
                 id             SERIAL PRIMARY KEY,
                 guild_id       TEXT NOT NULL,
@@ -66,14 +88,16 @@ async def init_db():
                 created_by     TEXT,
                 created_at     TIMESTAMPTZ DEFAULT NOW()
             );
-
+        """)
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS command_permissions (
                 command_name TEXT NOT NULL,
                 guild_id     TEXT NOT NULL,
                 role_id      TEXT NOT NULL,
                 PRIMARY KEY (command_name, guild_id, role_id)
             );
-
+        """)
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS analytics (
                 id             SERIAL PRIMARY KEY,
                 event_type     TEXT NOT NULL,
@@ -88,13 +112,15 @@ async def init_db():
                 estimated_cost REAL,
                 created_at     TIMESTAMPTZ DEFAULT NOW()
             );
-
+        """)
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS channel_prompts (
                 channel_id    TEXT PRIMARY KEY,
                 guild_id      TEXT NOT NULL,
                 system_prompt TEXT NOT NULL
             );
-
+        """)
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS scheduled_messages (
                 id             SERIAL PRIMARY KEY,
                 guild_id       TEXT NOT NULL,
@@ -105,7 +131,8 @@ async def init_db():
                 sent           INTEGER DEFAULT 0,
                 created_at     TIMESTAMPTZ DEFAULT NOW()
             );
-
+        """)
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS guild_config (
                 guild_id TEXT NOT NULL,
                 key      TEXT NOT NULL,
@@ -321,11 +348,13 @@ async def set_wizard_state(
 # =============================================================================
 
 async def create_session(token: str, user_id: str, expires_at: str):
+    from datetime import datetime
     pool = await get_pool()
     async with pool.acquire() as db:
+        expires_dt = datetime.fromisoformat(expires_at)
         await db.execute(
-            "INSERT INTO sessions (token, user_id, expires_at) VALUES ($1, $2, $3::timestamptz)",
-            token, user_id, expires_at,
+            "INSERT INTO sessions (token, user_id, expires_at) VALUES ($1, $2, $3)",
+            token, user_id, expires_dt,
         )
 
 
