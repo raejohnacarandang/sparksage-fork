@@ -151,7 +151,16 @@ async def init_db():
     );
 """)
 
-
+# -----------------------------------------------------------------
+        # Migrations — safe to run on every startup
+        # -----------------------------------------------------------------
+        await db.execute("""
+            ALTER TABLE conversations
+            ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+        """)
+        await db.execute("""
+            UPDATE conversations SET created_at = NOW() WHERE created_at IS NULL;
+        """)
 # =============================================================================
 # Global config helpers
 # =============================================================================
