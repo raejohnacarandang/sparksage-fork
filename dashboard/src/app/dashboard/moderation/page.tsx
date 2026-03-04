@@ -23,7 +23,7 @@ export default function ModerationPage() {
 
   useEffect(() => {
     if (!token) return;
-    fetch(`${API_URL}/api/config", {
+    fetch(`${API_URL}/api/config`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
@@ -41,7 +41,7 @@ export default function ModerationPage() {
     setSaving(true);
     setMessage(null);
     try {
-      const res = await fetch(`${API_URL}/api/config", {
+      const res = await fetch(`${API_URL}/api/config`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,

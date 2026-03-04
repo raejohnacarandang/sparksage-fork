@@ -30,7 +30,7 @@ export default function PermissionsPage() {
 
   const fetchPermissions = () => {
     if (!token) return;
-    fetch(`${API_URL}/api/permissions", {
+    fetch(`${API_URL}/api/permissions`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
@@ -48,7 +48,7 @@ export default function PermissionsPage() {
     setAdding(true);
     setMessage(null);
     try {
-      const res = await fetch(`${API_URL}/api/permissions", {
+      const res = await fetch(`${API_URL}/api/permissions`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -74,7 +74,7 @@ export default function PermissionsPage() {
   const handleDelete = async (perm: Permission) => {
     if (!token) return;
     try {
-      const res = await fetch(`${API_URL}/api/permissions", {
+      const res = await fetch(`${API_URL}/api/permissions`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
