@@ -23,6 +23,7 @@ import {
   Shield,
   Code2,
   Hash,
+  UserPlus,
 } from "lucide-react";
 import {
   Sidebar,
@@ -67,6 +68,7 @@ const NAV_GROUPS = [
   {
     label: "Features",
     items: [
+      { title: "Onboarding", href: "/dashboard/onboarding", icon: UserPlus },
       { title: "Plugins", href: "/dashboard/plugins", icon: Puzzle },
       { title: "Review", href: "/dashboard/review", icon: Code2 },
       { title: "Digest", href: "/dashboard/digest", icon: BookOpen },
@@ -130,10 +132,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname === "/wizard"}
-                >
+                <SidebarMenuButton asChild isActive={pathname === "/wizard"}>
                   <Link href="/wizard">
                     <Wand2 className="h-4 w-4" />
                     <span>Setup Wizard</span>
