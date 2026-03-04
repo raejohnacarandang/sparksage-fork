@@ -173,6 +173,7 @@ export default function DashboardOverview() {
 
     // Recent activity from analytics history
     fetch(
+      `${API_URL}/api/analytics/history`,
 
       { headers: { Authorization: `Bearer ${token}` } }
     )
