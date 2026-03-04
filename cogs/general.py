@@ -8,6 +8,7 @@ from discord import app_commands
 import config
 import providers
 import db as database
+from utils.rate_limiter import check_rate_limit
 
 
 class General(commands.Cog):
@@ -16,12 +17,27 @@ class General(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    # ── /ask ────────────────────────────────────────────────
+    # ── /ask ──────────────────────────────────────────────────────
 
     @app_commands.command(name="ask", description="Ask SparkSage a question")
     @app_commands.describe(question="Your question for SparkSage")
     async def ask(self, interaction: discord.Interaction, question: str):
         from bot import ask_ai
+
+        user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id) if interaction.guild_id else None
+
+        rate_error = check_rate_limit(user_id, guild_id)
+        if rate_error:
+            await interaction.response.send_message(rate_error, ephemeral=True)
+            await database.log_event(
+                "rate_limited",
+                guild_id=guild_id,
+                channel_id=str(interaction.channel_id),
+                user_id=user_id,
+            )
+            return
+
         await interaction.response.defer()
 
         start = time.monotonic()
@@ -39,16 +55,15 @@ class General(commands.Cog):
                 chunk += footer
             await interaction.followup.send(chunk)
 
-        # Estimate token counts (rough approximation: 1 token ≈ 4 chars)
         input_tokens = max(1, len(question) // 4)
         output_tokens = max(1, len(response) // 4)
         total_tokens = input_tokens + output_tokens
 
         await database.log_event(
             "command",
-            guild_id=str(interaction.guild_id) if interaction.guild_id else None,
+            guild_id=guild_id,
             channel_id=str(interaction.channel_id),
-            user_id=str(interaction.user.id),
+            user_id=user_id,
             username=interaction.user.display_name,
             provider=provider_name,
             tokens_used=total_tokens,
@@ -57,30 +72,47 @@ class General(commands.Cog):
             output_tokens=output_tokens,
         )
 
-    # ── /clear ──────────────────────────────────────────────
+    # ── /clear ────────────────────────────────────────────────────
 
     @app_commands.command(
         name="clear", description="Clear SparkSage's conversation memory for this channel"
     )
     async def clear(self, interaction: discord.Interaction):
+        user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id) if interaction.guild_id else None
+        rate_error = check_rate_limit(user_id, guild_id)
+        if rate_error:
+            await interaction.response.send_message(rate_error, ephemeral=True)
+            await database.log_event("rate_limited", guild_id=guild_id, channel_id=str(interaction.channel_id), user_id=user_id)
+            return
+
         await database.clear_messages(str(interaction.channel_id))
         await interaction.response.send_message("✅ Conversation history cleared!")
 
         await database.log_event(
             "clear",
-            guild_id=str(interaction.guild_id) if interaction.guild_id else None,
+            guild_id=guild_id,
             channel_id=str(interaction.channel_id),
-            user_id=str(interaction.user.id),
+            user_id=user_id,
             username=interaction.user.display_name,
         )
 
-    # ── /summarize ──────────────────────────────────────────
+    # ── /summarize ────────────────────────────────────────────────
 
     @app_commands.command(
         name="summarize", description="Summarize the recent conversation in this channel"
     )
     async def summarize(self, interaction: discord.Interaction):
         from bot import ask_ai, get_history
+
+        user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id) if interaction.guild_id else None
+        rate_error = check_rate_limit(user_id, guild_id)
+        if rate_error:
+            await interaction.response.send_message(rate_error, ephemeral=True)
+            await database.log_event("rate_limited", guild_id=guild_id, channel_id=str(interaction.channel_id), user_id=user_id)
+            return
+
         await interaction.response.defer()
 
         history = await get_history(interaction.channel_id)
@@ -106,9 +138,9 @@ class General(commands.Cog):
 
         await database.log_event(
             "summarize",
-            guild_id=str(interaction.guild_id) if interaction.guild_id else None,
+            guild_id=guild_id,
             channel_id=str(interaction.channel_id),
-            user_id=str(interaction.user.id),
+            user_id=user_id,
             username=interaction.user.display_name,
             provider=provider_name,
             tokens_used=input_tokens + output_tokens,
@@ -117,12 +149,20 @@ class General(commands.Cog):
             output_tokens=output_tokens,
         )
 
-    # ── /provider ────────────────────────────────────────────
+    # ── /provider ─────────────────────────────────────────────────
 
     @app_commands.command(
         name="provider", description="Show which AI provider SparkSage is currently using"
     )
     async def provider(self, interaction: discord.Interaction):
+        user_id = str(interaction.user.id)
+        guild_id = str(interaction.guild_id) if interaction.guild_id else None
+        rate_error = check_rate_limit(user_id, guild_id)
+        if rate_error:
+            await interaction.response.send_message(rate_error, ephemeral=True)
+            await database.log_event("rate_limited", guild_id=guild_id, channel_id=str(interaction.channel_id), user_id=user_id)
+            return
+
         primary = config.AI_PROVIDER
         provider_info = config.PROVIDERS.get(primary, {})
         available = providers.get_available_providers()
@@ -137,9 +177,9 @@ class General(commands.Cog):
 
         await database.log_event(
             "provider_check",
-            guild_id=str(interaction.guild_id) if interaction.guild_id else None,
+            guild_id=guild_id,
             channel_id=str(interaction.channel_id),
-            user_id=str(interaction.user.id),
+            user_id=user_id,
             username=interaction.user.display_name,
             provider=primary,
         )
