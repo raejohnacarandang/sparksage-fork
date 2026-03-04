@@ -1,17 +1,14 @@
 "use client";
-
 import type { MessageItem } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
-
 interface MessageListProps {
   messages: MessageItem[];
 }
-
 function formatTime(dateStr: string) {
-  const date = new Date(dateStr + "Z");
+  if (!dateStr) return "—";
+  const date = new Date(dateStr);
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
-
 export function MessageList({ messages }: MessageListProps) {
   if (messages.length === 0) {
     return (
@@ -20,7 +17,6 @@ export function MessageList({ messages }: MessageListProps) {
       </p>
     );
   }
-
   return (
     <div className="space-y-3">
       {messages.map((msg, i) => {
