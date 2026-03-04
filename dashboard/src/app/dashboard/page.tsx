@@ -37,6 +37,7 @@ interface ActivityEvent {
   id: number;
   event_type: string;
   user_id: string | null;
+  username: string | null;        // ← add this
   channel_id: string | null;
   provider: string | null;
   latency_ms: number | null;
@@ -87,7 +88,12 @@ function eventColor(type: string): string {
 }
 
 function eventText(event: ActivityEvent): string {
-  const user = event.user_id ? `by @${event.user_id}` : "";
+  const user = event.username
+    ? `by @${event.username}`
+    : event.user_id
+    ? `by @${event.user_id}`
+    : "";
+
   switch (event.event_type) {
     case "command": return `/ask used ${user}`.trim();
     case "clear": return `Conversation cleared ${user}`.trim();

@@ -102,9 +102,12 @@ async def get_history(_: dict = Depends(get_current_user)):
     pool = await database.get_pool()
     async with pool.acquire() as db:
         rows = await db.fetch(
-            """SELECT event_type, guild_id, channel_id, user_id, provider, latency_ms, created_at
-               FROM analytics
-               ORDER BY id DESC
+            """SELECT a.event_type, a.guild_id, a.channel_id, a.user_id,
+                      du.username,
+                      a.provider, a.latency_ms, a.created_at
+               FROM analytics a
+               LEFT JOIN dashboard_users du ON du.discord_id = a.user_id
+               ORDER BY a.id DESC
                LIMIT 100"""
         )
     return {"events": [dict(r) for r in rows]}
