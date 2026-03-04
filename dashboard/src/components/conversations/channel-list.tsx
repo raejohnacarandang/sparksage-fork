@@ -19,7 +19,8 @@ interface ChannelListProps {
 }
 
 function formatDate(dateStr: string) {
-  const date = new Date(dateStr + "Z");
+  if (!dateStr) return "—";
+  const date = new Date(dateStr);
   return date.toLocaleString();
 }
 
