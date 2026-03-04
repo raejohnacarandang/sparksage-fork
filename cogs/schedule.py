@@ -10,22 +10,20 @@ import db as database
 
 SCHEDULE_TABLE = """
 CREATE TABLE IF NOT EXISTS scheduled_messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     guild_id TEXT NOT NULL,
     channel_id TEXT NOT NULL,
     message TEXT NOT NULL,
-    scheduled_time TEXT NOT NULL,
+    scheduled_time TIMESTAMPTZ NOT NULL,
     created_by TEXT,
     sent INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 """
-
-
 async def init_schedule_table():
-    db = await database.get_db()
-    await db.execute(SCHEDULE_TABLE)
-    await db.commit()
+    pool = await database.get_pool()
+    async with pool.acquire() as db:
+        await db.execute(SCHEDULE_TABLE)
 
 
 class Schedule(commands.Cog):
