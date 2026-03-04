@@ -30,7 +30,7 @@ export default function ChannelPromptsPage() {
 
   const fetchPrompts = () => {
     if (!token) return;
-    fetch("${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/channel-prompts", {
+    fetch(`${API_URL}/api/channel-prompts", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
@@ -46,7 +46,7 @@ export default function ChannelPromptsPage() {
     setAdding(true);
     setMessage(null);
     try {
-      const res = await fetch("${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/channel-prompts", {
+      const res = await fetch(`${API_URL}/api/channel-prompts", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ channel_id: channelId, guild_id: guildId, system_prompt: promptText }),

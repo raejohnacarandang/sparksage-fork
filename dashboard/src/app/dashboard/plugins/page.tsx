@@ -27,7 +27,7 @@ export default function PluginsPage() {
 
   const fetchPlugins = () => {
     if (!token) return;
-    fetch("${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/plugins", {
+    fetch(`${API_URL}/api/plugins", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())

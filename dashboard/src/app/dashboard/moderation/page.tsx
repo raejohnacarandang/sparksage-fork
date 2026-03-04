@@ -23,7 +23,7 @@ export default function ModerationPage() {
 
   useEffect(() => {
     if (!token) return;
-    fetch("${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/config", {
+    fetch(`${API_URL}/api/config", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
@@ -41,7 +41,7 @@ export default function ModerationPage() {
     setSaving(true);
     setMessage(null);
     try {
-      const res = await fetch("${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/config", {
+      const res = await fetch(`${API_URL}/api/config", {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,

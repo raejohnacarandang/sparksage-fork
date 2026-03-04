@@ -173,7 +173,7 @@ export default function DashboardOverview() {
 
     // Recent activity from analytics history
     fetch(
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
       { headers: { Authorization: `Bearer ${token}` } }
     )
       .then((r) => r.json())
@@ -186,7 +186,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const connectWs = useCallback(() => {
     if (!mountedRef.current) return;
     try {
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
       const wsUrl = apiUrl.replace(/^https/, "wss").replace(/^http/, "ws") + "/ws/stats";
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
