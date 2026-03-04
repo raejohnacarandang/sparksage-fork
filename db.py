@@ -35,7 +35,7 @@ async def get_pool() -> asyncpg.Pool:
             # Can't inspect the loop — play it safe and recreate.
             _pool = None
     if _pool is None:
-        _pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=10)
+        _pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=3)
     return _pool
 
 
