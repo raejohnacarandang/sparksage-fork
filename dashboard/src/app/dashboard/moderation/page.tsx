@@ -48,10 +48,11 @@ export default function ModerationPage() {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          MODERATION_ENABLED: String(enabled),
-          MOD_LOG_CHANNEL_ID: logChannelId,
-          MODERATION_SENSITIVITY: sensitivity,
+          body: JSON.stringify({ values: {
+            MODERATION_ENABLED: String(enabled),
+            MOD_LOG_CHANNEL_ID: logChannelId,
+            MODERATION_SENSITIVITY: sensitivity,
+          } }),
         }),
       });
       if (res.ok) {
