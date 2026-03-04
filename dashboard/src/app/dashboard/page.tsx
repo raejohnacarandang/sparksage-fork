@@ -126,6 +126,7 @@ export default function DashboardOverview() {
   const mountedRef = useRef(true);
 
   const token = (session as { accessToken?: string })?.accessToken;
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   useEffect(() => setMounted(true), []);
 
