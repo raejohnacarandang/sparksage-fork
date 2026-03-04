@@ -53,7 +53,6 @@ export default function ModerationPage() {
             MOD_LOG_CHANNEL_ID: logChannelId,
             MODERATION_SENSITIVITY: sensitivity,
           } }),
-        }),
       });
       if (res.ok) {
         setMessage({ text: "Moderation settings saved!", ok: true });
