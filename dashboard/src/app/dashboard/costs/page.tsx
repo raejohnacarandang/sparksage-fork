@@ -46,18 +46,20 @@ export default function CostTrackingPage() {
   useEffect(() => {
     if (!token) return;
 
-    const pricingFetch = fetch("http://localhost:8000/api/costs/pricing", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => r.json())
-      .then((data) => { setPricing(data); return data; })
-      .catch(() => ({}));
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-    const analyticsFetch = fetch("http://localhost:8000/api/analytics/summary", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => r.json())
-      .catch(() => ({ providers: [] }));
+const pricingFetch = fetch(`${API_URL}/api/costs/pricing`, {
+  headers: { Authorization: `Bearer ${token}` },
+})
+  .then((r) => r.json())
+  .then((data) => { setPricing(data); return data; })
+  .catch(() => ({}));
+
+const analyticsFetch = fetch(`${API_URL}/api/analytics/summary`, {
+  headers: { Authorization: `Bearer ${token}` },
+})
+  .then((r) => r.json())
+  .catch(() => ({ providers: [] }));
 
     Promise.all([pricingFetch, analyticsFetch])
       .then(([pricingData, analyticsData]) => {
