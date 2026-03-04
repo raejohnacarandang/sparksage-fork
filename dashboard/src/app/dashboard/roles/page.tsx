@@ -102,7 +102,7 @@ export default function RolesPage() {
   const handleRoleChange = async (discordId: string, role: string) => {
     try {
       const res = await fetch(`${API_URL}/api/roles/users/${discordId}`, {
-        method: "PATCH",
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
