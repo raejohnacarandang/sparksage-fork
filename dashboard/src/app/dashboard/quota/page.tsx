@@ -29,6 +29,7 @@ export default function QuotaPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const token = (session as { accessToken?: string })?.accessToken;
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   const fetchData = () => {
     if (!token) return;

@@ -27,6 +27,7 @@ export default function PermissionsPage() {
   const [adding, setAdding] = useState(false);
 
   const token = (session as { accessToken?: string })?.accessToken;
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   const fetchPermissions = () => {
     if (!token) return;

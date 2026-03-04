@@ -20,6 +20,7 @@ export default function ModerationPage() {
   const [sensitivity, setSensitivity] = useState("medium");
 
   const token = (session as { accessToken?: string })?.accessToken;
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   useEffect(() => {
     if (!token) return;

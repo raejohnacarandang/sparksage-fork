@@ -27,6 +27,7 @@ export default function ChannelPromptsPage() {
   const [adding, setAdding] = useState(false);
 
   const token = (session as { accessToken?: string })?.accessToken;
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   const fetchPrompts = () => {
     if (!token) return;

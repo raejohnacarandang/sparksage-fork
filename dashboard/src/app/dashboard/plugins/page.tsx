@@ -24,6 +24,7 @@ export default function PluginsPage() {
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
   const token = (session as { accessToken?: string })?.accessToken;
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   const fetchPlugins = () => {
     if (!token) return;
