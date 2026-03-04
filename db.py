@@ -33,7 +33,7 @@ async def get_pool() -> asyncpg.Pool:
         except Exception:
             pass  # Keep existing pool if we can't inspect it
     if _pool is None:
-        _pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=3)
+        _pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=1)
     return _pool
 
 async def init_db():
