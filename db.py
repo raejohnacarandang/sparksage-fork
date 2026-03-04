@@ -25,16 +25,19 @@ async def reset_pool() -> None:
 
 async def get_pool() -> asyncpg.Pool:
     global _pool
+    # If the pool exists but its loop is closed, discard it.
     if _pool is not None:
         try:
             pool_loop = _pool._holders[0]._con._protocol._loop  # type: ignore[attr-defined]
             if pool_loop is not None and pool_loop.is_closed():
                 _pool = None
         except Exception:
-            pass  # Keep existing pool if we can't inspect it
+            # Can't inspect the loop — play it safe and recreate.
+            _pool = None
     if _pool is None:
-        _pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=1)
+        _pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=10)
     return _pool
+
 
 async def init_db():
     pool = await get_pool()
