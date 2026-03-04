@@ -37,6 +37,10 @@ SYSTEM_PROMPT = os.getenv(
     "Be concise, helpful, and engaging.",
 )
 
+# Rate limiting
+RATE_LIMIT_USER = int(os.getenv("RATE_LIMIT_USER", "10"))   # requests per minute per user
+RATE_LIMIT_GUILD = int(os.getenv("RATE_LIMIT_GUILD", "30"))  # requests per minute per guild
+
 # Dashboard settings
 DATABASE_PATH = os.getenv("DATABASE_PATH", "sparksage.db")
 DASHBOARD_PORT = int(os.getenv("DASHBOARD_PORT", "8000"))
@@ -114,14 +118,14 @@ PROVIDER_PRICING = {
         "free":               True,
     },
     "anthropic": {
-        "input_cost_per_1k":  0.003,   # claude-sonnet-4-6 input
-        "output_cost_per_1k": 0.015,   # claude-sonnet-4-6 output
+        "input_cost_per_1k":  0.003,
+        "output_cost_per_1k": 0.015,
         "monthly_budget":     50.0,
         "free":               False,
     },
     "openai": {
-        "input_cost_per_1k":  0.00015,  # gpt-4o-mini input
-        "output_cost_per_1k": 0.0006,   # gpt-4o-mini output
+        "input_cost_per_1k":  0.00015,
+        "output_cost_per_1k": 0.0006,
         "monthly_budget":     50.0,
         "free":               False,
     },
@@ -152,6 +156,8 @@ def reload_from_db(db_config: dict[str, str]):
         "DISCORD_CLIENT_ID": str,
         "DISCORD_CLIENT_SECRET": str,
         "JWT_SECRET": str,
+        "RATE_LIMIT_USER": int,
+        "RATE_LIMIT_GUILD": int,
     }
 
     for key, converter in mapping.items():
