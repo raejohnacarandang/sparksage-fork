@@ -189,7 +189,7 @@ export default function DashboardOverview() {
     if (!mountedRef.current) return;
     try {
 
-      const wsUrl = apiUrl.replace(/^https/, "wss").replace(/^http/, "ws") + "/ws/stats";
+      const wsUrl = API_URL.replace(/^https/, "wss").replace(/^http/, "ws") + "/ws/stats";
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
       ws.onopen = () => { if (mountedRef.current) setWsConnected(true); };
