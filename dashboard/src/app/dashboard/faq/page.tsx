@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
@@ -7,6 +7,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface FAQ {
   id: number;
@@ -24,6 +34,7 @@ export default function FAQPage() {
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
 
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
@@ -84,21 +95,23 @@ export default function FAQPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!token) return;
+  const confirmDeleteFaq = async () => {
+    if (!token || confirmDelete === null) return;
     try {
-      const res = await fetch(`${API_URL}/api/faqs/${id}`, {
+      const res = await fetch(`${API_URL}/api/faqs/${confirmDelete}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        setMessage({ text: `FAQ #${id} deleted`, ok: true });
+        setMessage({ text: `FAQ #${confirmDelete} deleted`, ok: true });
         fetchFaqs();
       } else {
         setMessage({ text: "Failed to delete FAQ", ok: false });
       }
     } catch {
       setMessage({ text: "Error deleting FAQ", ok: false });
+    } finally {
+      setConfirmDelete(null);
     }
   };
 
@@ -190,7 +203,7 @@ export default function FAQPage() {
                     size="sm"
                     variant="ghost"
                     className="h-7 w-7 p-0 text-destructive hover:text-destructive flex-shrink-0"
-                    onClick={() => handleDelete(faq.id)}
+                    onClick={() => setConfirmDelete(faq.id)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -208,6 +221,26 @@ export default function FAQPage() {
           ))}
         </div>
       )}
+
+      <AlertDialog open={confirmDelete !== null} onOpenChange={() => setConfirmDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete FAQ #{confirmDelete}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This FAQ will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={confirmDeleteFaq}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
