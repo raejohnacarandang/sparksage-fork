@@ -350,10 +350,17 @@ export default function DashboardOverview() {
             </Button>
           </a>
 
-          <Badge variant={wsConnected ? "default" : "destructive"} className="flex items-center gap-1.5 text-xs">
-            <Radio className={`h-3 w-3 ${wsConnected ? "animate-pulse" : ""}`} />
-            {wsConnected ? "Live" : "Reconnecting..."}
-          </Badge>
+         <Badge 
+  variant="outline"
+  className={`flex items-center gap-1.5 text-xs ${
+    wsConnected 
+      ? "border-green-500/30 bg-green-500/10 text-green-400" 
+      : "border-red-500/30 bg-red-500/10 text-red-400"
+  }`}
+>
+  <span className={`h-1.5 w-1.5 rounded-full ${wsConnected ? "bg-green-400 shadow-[0_0_6px_#4ade80] animate-pulse" : "bg-red-400"}`} />
+  {wsConnected ? "Live" : "Reconnecting..."}
+</Badge>
         </div>
       </div>
 
@@ -369,9 +376,16 @@ export default function DashboardOverview() {
           <CardContent>
             {loading ? <p className="text-sm text-muted-foreground">Connecting...</p> : (
               <div>
-                <Badge variant={botStatus?.online ? "default" : "secondary"}>
-                  {botStatus?.online ? "Online" : "Offline"}
-                </Badge>
+                <Badge 
+  variant="outline"
+  className={botStatus?.online 
+    ? "border-green-500/40 bg-green-500/10 text-green-400 gap-1.5" 
+    : "border-zinc-600 bg-zinc-800 text-zinc-400 gap-1.5"
+  }
+>
+  <span className={`h-1.5 w-1.5 rounded-full ${botStatus?.online ? "bg-green-400 shadow-[0_0_6px_#4ade80] animate-pulse" : "bg-zinc-500"}`} />
+  {botStatus?.online ? "Online" : "Offline"}
+</Badge>
                 {botStatus?.username && (
                   <p className="text-xs text-muted-foreground mt-1 truncate">{botStatus.username}</p>
                 )}
