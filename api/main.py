@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.routes import (
     auth, config, providers, bot, conversations, wizard,
     review, analytics, costs, plugins, permissions,
-    channel_prompts, quota, faq, websocket,
+    channel_prompts, channel_providers, quota, faq, websocket,
 )
 
 import db
@@ -53,6 +53,7 @@ def create_app() -> FastAPI:
     app.include_router(plugins.router)
     app.include_router(permissions.router,     prefix="/api/permissions",     tags=["permissions"])
     app.include_router(channel_prompts.router, prefix="/api/channel-prompts", tags=["channel-prompts"])
+    app.include_router(channel_providers.router, prefix="/api/channel-providers", tags=["channel-providers"])
     app.include_router(quota.router)
     app.include_router(faq.router,             prefix="/api/faqs",            tags=["faqs"])
     app.include_router(websocket.router)
