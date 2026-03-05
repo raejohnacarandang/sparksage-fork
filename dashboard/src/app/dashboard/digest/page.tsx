@@ -53,7 +53,6 @@ export default function DigestPage() {
           DIGEST_CHANNEL_ID: channelId,
             DIGEST_TIME: digestTime,
           } }),
-        }),
       });
       if (res.ok) {
         setMessage({ text: "Digest settings saved!", ok: true });
