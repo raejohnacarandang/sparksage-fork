@@ -299,7 +299,7 @@ export default function DashboardOverview() {
           <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
             {mounted && (theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />)}
           </Button>
-          
+
           <a
           href={"https://discord.com/oauth2/authorize?client_id=1473966664411516928&permissions=8&scope=bot%20applications.commands"}
           target="_blank"
@@ -317,6 +317,10 @@ export default function DashboardOverview() {
             <Radio className={`h-3 w-3 ${wsConnected ? "animate-pulse" : ""}`} />
             {wsConnected ? "Live" : "Reconnecting..."}
           </Badge>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
