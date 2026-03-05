@@ -93,6 +93,9 @@ export default function RolesPage() {
         setNewUsername("");
         setNewRole("viewer");
         fetchUsers();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.detail || `Failed to add user (${res.status})`);
       }
     } catch {
       toast.error("Failed to add user");
@@ -102,7 +105,7 @@ export default function RolesPage() {
   const handleRoleChange = async (discordId: string, role: string) => {
     try {
       const res = await fetch(`${API_URL}/api/roles/users/${discordId}`, {
-        method: "PUT",
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
