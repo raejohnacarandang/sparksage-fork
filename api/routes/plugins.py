@@ -87,7 +87,7 @@ async def enable_plugin(name: str, _=Depends(require_auth)):
     try:
         await bot.load_extension(ext_name)
         # Schedule sync as background task to avoid aiohttp context issues
-        asyncio.get_event_loop().create_task(bot.tree.sync())
+        bot.loop.create_task(bot.tree.sync())
         return {"message": f"Plugin '{name}' enabled successfully"}
     except Exception as e:
         import traceback
@@ -114,7 +114,7 @@ async def disable_plugin(name: str, _=Depends(require_auth)):
     try:
         await bot.unload_extension(ext_name)
         # Schedule sync as background task
-        asyncio.get_event_loop().create_task(bot.tree.sync())
+        bot.loop.create_task(bot.tree.sync())
         return {"message": f"Plugin '{name}' disabled successfully"}
     except Exception as e:
         import traceback
