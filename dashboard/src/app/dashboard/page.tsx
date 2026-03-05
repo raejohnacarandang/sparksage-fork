@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useSession } from "next-auth/react";
@@ -54,6 +54,8 @@ interface Notification {
   text: string;
   type: string;
   time: string;
+  href?: string;
+  read: boolean;
 }
 
 const QUICK_ACTIONS = [
@@ -120,6 +122,7 @@ export default function DashboardOverview() {
   const [commandData, setCommandData] = useState<CommandCount[]>([]);
   const [activityData, setActivityData] = useState<ActivityEvent[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [readCount, setReadCount] = useState(0);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<NodeJS.Timeout | null>(null);
@@ -155,19 +158,21 @@ export default function DashboardOverview() {
       })).sort((a, b) => b.count - a.count).slice(0, 6);
       setCommandData(commands);
 
-      // Build notifications from real data
+      // Build notifications from real analytics data
       const notifs: Notification[] = [];
+      let idCounter = 1;
       const totalEvents = Object.values(byType).reduce((a: number, b) => a + (b as number), 0);
       if (totalEvents > 0) {
-        notifs.push({ id: 1, text: `${totalEvents} total events recorded`, type: "info", time: "now" });
+        notifs.push({ id: idCounter++, text: `${totalEvents} total bot events recorded`, type: "info", time: "now", href: "/dashboard/analytics", read: false });
       }
       if (data.avg_latency_ms) {
-        const latency = data.avg_latency_ms;
+        const latency = Math.round(data.avg_latency_ms);
         if (latency > 2000) {
-          notifs.push({ id: 2, text: `High avg latency: ${latency}ms`, type: "warning", time: "now" });
-        } else {
-          notifs.push({ id: 2, text: `Avg response latency: ${latency}ms`, type: "info", time: "now" });
+          notifs.push({ id: idCounter++, text: `⚠️ High avg latency: ${latency}ms — check provider`, type: "warning", time: "now", href: "/dashboard/providers", read: false });
         }
+      }
+      if (byType["rate_limited"] > 0) {
+        notifs.push({ id: idCounter++, text: `🚫 ${byType["rate_limited"]} rate limit hits detected`, type: "warning", time: "now", href: "/dashboard/quota", read: false });
       }
       setNotifications(notifs);
     }).catch(() => {});
@@ -180,7 +185,24 @@ export default function DashboardOverview() {
     )
       .then((r) => r.json())
       .then((data) => {
-        if (data.events) setActivityData(data.events.slice(0, 5));
+        if (data.events) {
+          setActivityData(data.events.slice(0, 5));
+          // Add recent activity as notifications
+          setNotifications((prev) => {
+            const existing = new Set(prev.map((n) => n.id));
+            const newNotifs = data.events.slice(0, 3).map((e: ActivityEvent, i: number) => ({
+              id: 1000 + i,
+              text: eventText(e),
+              type: e.event_type,
+              time: timeAgo(e.created_at),
+              href: e.event_type === "moderation" ? "/dashboard/moderation"
+                : e.event_type === "faq" ? "/dashboard/faq"
+                : "/dashboard/analytics",
+              read: false,
+            })).filter((n: Notification) => !existing.has(n.id));
+            return [...prev, ...newNotifs];
+          });
+        }
       })
       .catch(() => {});
   }, [token]);
@@ -268,11 +290,11 @@ export default function DashboardOverview() {
           </div>
 
           <div className="relative">
-            <Button variant="outline" size="icon" className="h-9 w-9 relative" onClick={() => setShowNotifications(!showNotifications)}>
+            <Button variant="outline" size="icon" className="h-9 w-9 relative" onClick={() => { setShowNotifications(!showNotifications); setReadCount(notifications.length); }}>
               <Bell className="h-4 w-4" />
-              {notifications.length > 0 && (
+              {notifications.length > readCount && (
                 <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center">
-                  {notifications.length}
+                  {notifications.length - readCount}
                 </span>
               )}
             </Button>
@@ -287,10 +309,28 @@ export default function DashboardOverview() {
                 {notifications.length === 0 ? (
                   <p className="text-sm text-muted-foreground px-3 py-4 text-center">No notifications</p>
                 ) : notifications.map((n) => (
-                  <div key={n.id} className="px-3 py-2.5 border-b last:border-0 hover:bg-muted">
-                    <p className="text-sm">{n.text}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{n.time}</p>
-                  </div>
+                  n.href ? (
+                    <Link key={n.id} href={n.href} onClick={() => setShowNotifications(false)}
+                      className="block px-3 py-2.5 border-b last:border-0 hover:bg-muted cursor-pointer">
+                      <div className="flex items-start gap-2">
+                        <span className={`mt-1.5 h-2 w-2 rounded-full flex-shrink-0 ${n.type === "warning" ? "bg-yellow-500" : "bg-blue-500"}`} />
+                        <div>
+                          <p className="text-sm">{n.text}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{n.time}</p>
+                        </div>
+                      </div>
+                    </Link>
+                  ) : (
+                    <div key={n.id} className="px-3 py-2.5 border-b last:border-0 hover:bg-muted">
+                      <div className="flex items-start gap-2">
+                        <span className={`mt-1.5 h-2 w-2 rounded-full flex-shrink-0 ${n.type === "warning" ? "bg-yellow-500" : "bg-blue-500"}`} />
+                        <div>
+                          <p className="text-sm">{n.text}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{n.time}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )
                 ))}
               </div>
             )}
