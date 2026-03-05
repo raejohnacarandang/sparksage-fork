@@ -6,7 +6,6 @@ import { Puzzle, CheckCircle, XCircle, Info, Upload, X, Plus, Trash2, Package } 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 
 interface Plugin {
   name: string;
@@ -28,6 +27,7 @@ export default function PluginsPage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<Partial<Plugin> | null>(null);
+  const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const token = (session as { accessToken?: string })?.accessToken;
@@ -48,21 +48,19 @@ export default function PluginsPage() {
     fetchPlugins();
   }, [token]);
 
-  const handleFileSelect = async (file: File) => {
+  const handleFileSelect = (file: File) => {
     if (!file.name.endsWith(".zip")) {
-      toast.error("Please upload a .zip file");
+      setMessage({ text: "Please upload a .zip file", ok: false });
       return;
     }
     setUploadFile(file);
-
-    // Try to preview manifest from ZIP using JSZip-like parsing
-    // We'll just show the filename for now and let the server parse it
     setPreview({ name: file.name.replace(".zip", ""), description: "Upload to see plugin details" });
   };
 
   const handleUpload = async () => {
     if (!uploadFile || !token) return;
     setUploading(true);
+    setMessage(null);
 
     const formData = new FormData();
     formData.append("file", uploadFile);
@@ -75,16 +73,16 @@ export default function PluginsPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success(data.message || "Plugin installed!");
+        setMessage({ text: data.message || "Plugin installed successfully!", ok: true });
         setShowModal(false);
         setUploadFile(null);
         setPreview(null);
         fetchPlugins();
       } else {
-        toast.error(data.detail || "Upload failed");
+        setMessage({ text: data.detail || "Upload failed", ok: false });
       }
     } catch {
-      toast.error("Upload failed");
+      setMessage({ text: "Upload failed", ok: false });
     } finally {
       setUploading(false);
     }
@@ -93,6 +91,7 @@ export default function PluginsPage() {
   const handleToggle = async (plugin: Plugin) => {
     if (!token) return;
     setActionLoading(plugin.name);
+    setMessage(null);
 
     const action = plugin.enabled ? "disable" : "enable";
     try {
@@ -102,13 +101,13 @@ export default function PluginsPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success(data.message || `Plugin ${action}d`);
+        setMessage({ text: data.message || `Plugin ${action}d successfully`, ok: true });
       } else {
-        toast.error(data.detail || `Failed to ${action} plugin`);
+        setMessage({ text: data.detail || `Failed to ${action} plugin`, ok: false });
       }
       fetchPlugins();
     } catch {
-      toast.error("Action failed");
+      setMessage({ text: "Action failed", ok: false });
     } finally {
       setActionLoading(null);
     }
@@ -117,6 +116,7 @@ export default function PluginsPage() {
   const handleDelete = async (plugin: Plugin) => {
     if (!token) return;
     if (!confirm(`Delete plugin "${plugin.name}"? This cannot be undone.`)) return;
+    setMessage(null);
 
     try {
       const res = await fetch(`${API_URL}/api/plugins/${plugin.name}`, {
@@ -125,13 +125,13 @@ export default function PluginsPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success(data.message || "Plugin deleted");
+        setMessage({ text: data.message || "Plugin deleted", ok: true });
         fetchPlugins();
       } else {
-        toast.error(data.detail || "Delete failed");
+        setMessage({ text: data.detail || "Delete failed", ok: false });
       }
     } catch {
-      toast.error("Delete failed");
+      setMessage({ text: "Delete failed", ok: false });
     }
   };
 
@@ -154,13 +154,26 @@ export default function PluginsPage() {
         </Button>
       </div>
 
+      {/* Status message */}
+      {message && (
+        <Card className={message.ok ? "border-green-400 bg-green-50 dark:bg-green-950/20" : "border-red-400 bg-red-50 dark:bg-red-950/20"}>
+          <CardContent className="pt-4 flex items-center gap-2">
+            {message.ok
+              ? <CheckCircle className="h-4 w-4 text-green-500" />
+              : <XCircle className="h-4 w-4 text-red-500" />}
+            <p className="text-sm">{message.text}</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* How to add plugins info */}
       <Card className="border-dashed">
         <CardContent className="pt-4 flex items-start gap-2">
           <Info className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
           <p className="text-xs text-muted-foreground">
             Upload a <code className="bg-muted px-1 rounded">.zip</code> file containing a{" "}
-            <code className="bg-muted px-1 rounded">manifest.json</code> and cog <code className="bg-muted px-1 rounded">.py</code> file.
+            <code className="bg-muted px-1 rounded">manifest.json</code> and cog{" "}
+            <code className="bg-muted px-1 rounded">.py</code> file.
             Plugins can be enabled/disabled without restarting the bot.
           </p>
         </CardContent>
