@@ -48,10 +48,11 @@ export default function DigestPage() {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
+          body: JSON.stringify({ values: {
           DIGEST_ENABLED: String(enabled),
           DIGEST_CHANNEL_ID: channelId,
-          DIGEST_TIME: digestTime,
+            DIGEST_TIME: digestTime,
+          } }),
         }),
       });
       if (res.ok) {
