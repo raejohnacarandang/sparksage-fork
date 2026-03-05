@@ -151,6 +151,39 @@ async def init_db():
     );
 """)
 
+async def init_plugins_table():
+    pool = await get_pool()
+    async with pool.acquire() as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS plugins (
+                name        TEXT PRIMARY KEY,
+                version     TEXT NOT NULL,
+                author      TEXT NOT NULL DEFAULT 'community',
+                description TEXT NOT NULL DEFAULT '',
+                cog         TEXT NOT NULL,
+                code        TEXT NOT NULL,
+                manifest    TEXT NOT NULL,
+                enabled     BOOLEAN NOT NULL DEFAULT FALSE,
+                installed_at TIMESTAMPTZ DEFAULT NOW()
+            );
+        """)
+
+async def save_plugin(name: str, version: str, author: str, description: str, cog: str, code: str, manifest: str):
+    pool = await get_pool()
+    async with pool.acquire() as db:
+        await db.execute("""
+            INSERT INTO plugins (name, version, author, description, cog, code, manifest)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (name) DO UPDATE SET
+                version = EXCLUDED.version,
+                author = EXCLUDED.author,
+                description = EXCLUDED.description,
+                cog = EXCLUDED.cog,
+                code = EXCLUDED.code,
+                manifest = EXCLUDED.manifest,
+                installed_at = NOW()
+        """, name, version, author, description, cog, code, manifest)
+
 # -----------------------------------------------------------------
         # Migrations — safe to run on every startup
         # -----------------------------------------------------------------
@@ -612,3 +645,25 @@ async def list_channel_prompts(guild_id: str) -> list[dict]:
             guild_id,
         )
     return [dict(row) for row in rows]
+
+async def list_db_plugins() -> list[dict]:
+    pool = await get_pool()
+    async with pool.acquire() as db:
+        rows = await db.fetch("SELECT name, version, author, description, cog, enabled, installed_at FROM plugins ORDER BY name")
+    return [dict(row) for row in rows]
+
+async def get_plugin_code(name: str) -> str | None:
+    pool = await get_pool()
+    async with pool.acquire() as db:
+        row = await db.fetchrow("SELECT code, cog FROM plugins WHERE name = $1", name)
+    return row if row else None
+
+async def set_plugin_enabled(name: str, enabled: bool):
+    pool = await get_pool()
+    async with pool.acquire() as db:
+        await db.execute("UPDATE plugins SET enabled = $1 WHERE name = $2", enabled, name)
+
+async def delete_plugin(name: str):
+    pool = await get_pool()
+    async with pool.acquire() as db:
+        await db.execute("DELETE FROM plugins WHERE name = $1", name)
